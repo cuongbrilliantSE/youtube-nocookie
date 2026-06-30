@@ -90,16 +90,16 @@ app.get('/api/search/facebook', async (req, res) => {
 
   const engines = [
     {
+      name: 'DuckDuckGo',
+      url: `https://html.duckduckgo.com/html/?q=site:facebook.com/reel+${encodeURIComponent(query)}`
+    },
+    {
       name: 'Bing',
       url: `https://www.bing.com/search?q=site:facebook.com/reel+${encodeURIComponent(query)}`
     },
     {
       name: 'Yahoo',
       url: `https://search.yahoo.com/search?q=site:facebook.com/reel+${encodeURIComponent(query)}`
-    },
-    {
-      name: 'DuckDuckGo',
-      url: `https://html.duckduckgo.com/html/?q=site:facebook.com/reel+${encodeURIComponent(query)}`
     }
   ];
 
