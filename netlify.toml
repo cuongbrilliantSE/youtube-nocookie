@@ -6,3 +6,8 @@
   from = "/api/search"
   to = "/.netlify/functions/search"
   status = 200
+
+[[redirects]]
+  from = "/api/search/facebook"
+  to = "/.netlify/functions/search-facebook"
+  status = 200
