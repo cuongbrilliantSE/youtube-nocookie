@@ -67,72 +67,130 @@ function decodeHtmlEntities(str) {
             });
 }
 
-// Search Facebook Reels API endpoint using Yahoo Search (bypasses DuckDuckGo captcha blocks)
+// Helper function to fetch with a timeout using AbortController
+async function fetchWithTimeout(resource, options = {}) {
+  const { timeout = 3500 } = options;
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  
+  const response = await fetch(resource, {
+    ...options,
+    signal: controller.signal
+  });
+  clearTimeout(id);
+  return response;
+}
+
+// Search Facebook Reels API endpoint using multi-engine fallback (Bing, Yahoo, DuckDuckGo)
 app.get('/api/search/facebook', async (req, res) => {
-  try {
-    const query = req.query.q;
-    if (!query) {
-      return res.status(400).json({ error: 'Missing query parameter' });
+  const query = req.query.q;
+  if (!query) {
+    return res.status(400).json({ error: 'Missing query parameter' });
+  }
+
+  const engines = [
+    {
+      name: 'Bing',
+      url: `https://www.bing.com/search?q=site:facebook.com/reel+${encodeURIComponent(query)}`
+    },
+    {
+      name: 'Yahoo',
+      url: `https://search.yahoo.com/search?q=site:facebook.com/reel+${encodeURIComponent(query)}`
+    },
+    {
+      name: 'DuckDuckGo',
+      url: `https://html.duckduckgo.com/html/?q=site:facebook.com/reel+${encodeURIComponent(query)}`
     }
+  ];
 
-    const url = `https://search.yahoo.com/search?q=site:facebook.com/reel+${encodeURIComponent(query)}`;
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5'
-      }
-    });
+  let lastError = null;
 
-    if (!response.ok) {
-      throw new Error(`Yahoo search failed with status: ${response.status}`);
-    }
+  for (const engine of engines) {
+    try {
+      console.log(`Trying Facebook search via ${engine.name}...`);
+      const response = await fetchWithTimeout(engine.url, {
+        timeout: 4000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5'
+        }
+      });
 
-    const html = await response.text();
-    const aRegex = /<a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
-    let match;
-    const videos = [];
-    
-    while ((match = aRegex.exec(html)) !== null && videos.length < 12) {
-      let href = match[1];
-      const aContent = match[2];
-
-      // Decode RU parameter from Yahoo redirect URL
-      const ruMatch = href.match(/RU=(https%3a%2f%2f[^/]+)/i);
-      if (ruMatch) {
-        href = decodeURIComponent(ruMatch[1]);
+      if (!response.ok) {
+        throw new Error(`${engine.name} returned status: ${response.status}`);
       }
 
-      if (href.includes('facebook.com/reel/')) {
-        const reelIdMatch = href.match(/\/reel\/([0-9a-zA-Z_-]+)/);
-        const reelId = reelIdMatch ? reelIdMatch[1] : '';
-        
-        if (reelId) {
-          // Extract title inside nested <h3><span ...>TITLE</span></h3>
-          const titleMatch = aContent.match(/<h3[^>]*class="[^"]*title[^"]*"[^>]*><span[^>]*>([\s\S]*?)<\/span><\/h3>/);
-          let title = titleMatch ? titleMatch[1].replace(/<[^>]*>/g, '').trim() : '';
-          title = decodeHtmlEntities(title);
-          title = title.replace(/\s*-\s*Facebook\s*$/i, '');
+      const html = await response.text();
+      const aRegex = /<a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
+      let match;
+      const videos = [];
 
-          videos.push({
-            id: reelId,
-            title: title || `Facebook Reel ${reelId}`,
-            url: href,
-            thumbnail: '', // Styled with Reels gradient & SVG logo on client
-            duration: 'Reel',
-            author: 'Facebook Creator',
-            views: null,
-            ago: null
-          });
+      while ((match = aRegex.exec(html)) !== null && videos.length < 12) {
+        let href = match[1];
+        const aContent = match[2];
+
+        // Decode RU parameter from Yahoo redirect URL
+        const ruMatch = href.match(/RU=(https%3a%2f%2f[^/]+)/i);
+        if (ruMatch) {
+          href = decodeURIComponent(ruMatch[1]);
+        }
+
+        // Handle DuckDuckGo redirect URL format
+        if (href.startsWith('/l/?') || href.includes('uddg=')) {
+          const uddgMatch = href.match(/uddg=([^&]+)/);
+          if (uddgMatch) {
+            href = decodeURIComponent(uddgMatch[1]);
+          }
+        }
+
+        if (href.includes('facebook.com/reel/')) {
+          const reelIdMatch = href.match(/\/reel\/([0-9a-zA-Z_-]+)/);
+          const reelId = reelIdMatch ? reelIdMatch[1] : '';
+
+          if (reelId) {
+            // Find titles matching headers or spans, generic fallbacks
+            const titleMatch = aContent.match(/<h3[^>]*>([\s\S]*?)<\/h3>/) ||
+                               aContent.match(/<span[^>]*>([\s\S]*?)<\/span>/) ||
+                               [null, ''];
+            let title = titleMatch[1] ? titleMatch[1].replace(/<[^>]*>/g, '').trim() : '';
+            title = decodeHtmlEntities(title);
+            title = title.replace(/\s*-\s*Facebook\s*$/i, '');
+
+            // De-duplicate reel IDs
+            if (!videos.some(v => v.id === reelId)) {
+              videos.push({
+                id: reelId,
+                title: title || `Facebook Reel ${reelId}`,
+                url: `https://www.facebook.com/reel/${reelId}/`,
+                thumbnail: '',
+                duration: 'Reel',
+                author: 'Facebook Creator',
+                views: null,
+                ago: null
+              });
+            }
+          }
         }
       }
-    }
 
-    res.json({ success: true, videos });
-  } catch (error) {
-    console.error('Facebook search error:', error);
-    res.status(500).json({ error: 'Failed to perform Facebook search' });
+      if (videos.length > 0) {
+        console.log(`Successfully found ${videos.length} videos from ${engine.name}`);
+        return res.json({ success: true, videos });
+      } else {
+        console.log(`No videos found on ${engine.name}, trying next...`);
+      }
+    } catch (error) {
+      console.warn(`Search via ${engine.name} failed:`, error.message);
+      lastError = error;
+    }
   }
+
+  console.error('All search engines failed to return results.');
+  res.status(500).json({ 
+    error: 'Failed to perform Facebook search on all engines',
+    details: lastError ? lastError.message : 'Unknown network error'
+  });
 });
 
 // Proxy Video Stream endpoint using yt-dlp stdout pipe (fixes 403 Forbidden CDN issues)
