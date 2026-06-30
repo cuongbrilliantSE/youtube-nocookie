@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Privacy Player - No-Cookie Embed</title>
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Warning alert if opened locally via file:// -->
+        <div id="fileWarning" class="alert-warning" style="display: none;">
+            <div>
+                ⚠️ <strong>Cần chạy ứng dụng qua Web Server.</strong>
+            </div>
+            <div>
+                YouTube chặn nhúng video khi mở trực tiếp bằng tệp tin (<code>file://</code>). 
+                Vui lòng khởi động server Node.js bằng cách chạy lệnh sau trong terminal:
+                <br>
+                <code>npm run dev</code>
+            </div>
+        </div>
+
+        <header>
+            <h1>
+                <svg width="36" height="36" viewBox="0 0 24 24">
+                    <path d="M23.498 6.163a3.003 3.003 0 0 0-2.11-2.11C19.517 3.545 12 3.545 12 3.545s-7.517 0-9.388.508a3.003 3.003 0 0 0-2.11 2.11C0 8.033 0 12 0 12s0 3.967.502 5.837a3.003 3.003 0 0 0 2.11 2.11c1.871.508 9.388.508 9.388.508s7.517 0 9.388-.508a3.002 3.002 0 0 0 2.11-2.11C24 15.967 24 12 24 12s0-3.967-.502-5.837zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                </svg>
+                YouTube Privacy Player
+            </h1>
+        </header>
+
+        <!-- Main Input Card -->
+        <main class="glass-card">
+            <div class="input-row">
+                <div class="input-container">
+                    <input type="text" id="urlInput" placeholder="Dán link YouTube vào đây... (Ví dụ: https://www.youtube.com/watch?v=... hoặc Shorts, hay mã ID video)" autocomplete="off">
+                    <button class="clear-btn" id="clearInputBtn" title="Xóa nội dung">&times;</button>
+                </div>
+                <button class="primary-btn" id="embedBtn">
+                    Nhúng Video
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Predefined quick suggestions -->
+            <div class="presets">
+                <span>Gợi ý:</span>
+                <span class="preset-tag" onclick="selectPreset('https://www.youtube.com/watch?v=jfKfPfyJRdk')">Lofi Girl Coding</span>
+                <span class="preset-tag" onclick="selectPreset('https://www.youtube.com/watch?v=dQw4w9WgXcQ')">Rickroll</span>
+                <span class="preset-tag" onclick="selectPreset('https://www.youtube.com/watch?v=EngW7tLk6R8')">Nature 4K Relaxation</span>
+            </div>
+        </main>
+
+        <!-- Error Alert -->
+        <div class="error-toast" id="errorMsg">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <span>Đường dẫn không hợp lệ. Vui lòng nhập đúng liên kết YouTube hoặc ID video (11 ký tự).</span>
+        </div>
+
+        <!-- Video Player Card -->
+        <section class="glass-card video-card" id="videoWrapper">
+            <div class="video-aspect-ratio">
+                <iframe id="videoFrame" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"></iframe>
+            </div>
+        </section>
+
+        <!-- History/Library Card -->
+        <section class="glass-card history-section">
+            <div class="history-header">
+                <h3>Lịch sử đã xem</h3>
+                <button class="clear-history-btn" id="clearHistoryBtn">Xóa tất cả</button>
+            </div>
+            <div class="history-list" id="historyList">
+                <!-- Dynamic Content Loaded from JS -->
+            </div>
+        </section>
+
+        <footer>
+            <span>Phát triển bằng Node.js & Express</span>
+            <span>•</span>
+            <a href="https://www.youtube-nocookie.com" target="_blank" rel="noopener noreferrer">YouTube No-Cookie</a>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
