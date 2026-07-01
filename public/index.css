@@ -955,6 +955,76 @@ img { display: block; }
 }
 
 /* ──────── Responsive ──────── */
+/* ──────── Mini Player ──────── */
+.mini-player {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 300px;
+    background: var(--bgElevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-panel);
+    overflow: hidden;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+    z-index: 500;
+    animation: mini-slide-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes mini-slide-in {
+    from { opacity: 0; transform: translateY(20px) scale(0.95); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.mini-player-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: var(--bgElevated);
+    border-bottom: 1px solid var(--border);
+}
+
+.mini-player-title {
+    flex: 1;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mini-player-actions {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.mini-btn {
+    background: none;
+    border: none;
+    color: var(--textSub);
+    padding: 5px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background var(--transition), color var(--transition);
+}
+
+.mini-btn:hover {
+    background: var(--surfaceHover);
+    color: var(--text);
+}
+
+.mini-player iframe {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border: none;
+    display: block;
+}
+
+/* ──────── Responsive ──────── */
 @media (max-width: 900px) {
     .sidebar {
         transform: translateX(-100%);

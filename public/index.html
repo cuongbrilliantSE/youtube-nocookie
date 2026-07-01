@@ -175,6 +175,22 @@
         </div>
     </div>
 
+    <!-- ── Mini Player (floating, bottom-right) ── -->
+    <div class="mini-player" id="miniPlayer" style="display:none">
+        <div class="mini-player-top">
+            <span class="mini-player-title" id="miniPlayerTitle"></span>
+            <div class="mini-player-actions">
+                <button class="mini-btn" id="miniExpandBtn" title="Mở rộng">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+                </button>
+                <button class="mini-btn" id="miniCloseBtn" title="Đóng">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+        </div>
+        <iframe id="miniFrame" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture"></iframe>
+    </div>
+
     <script src="app.js"></script>
 </body>
 </html>

@@ -8,6 +8,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let history = JSON.parse(localStorage.getItem('yt_embed_history')) || [];
     let searchResults = [];
     let isSearching = false;
+    let miniVideoData = null;   // video object currently in mini player
+    let watchStartTime = null;  // Date.now() when current video started playing
 
     // ── Avatar palette ──
     const AVATAR_COLORS = ['#3FCFC0', '#B58EF0', '#E8A93F', '#5FA8F5', '#6EE7B7', '#F0A8C8'];
@@ -78,6 +80,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const gridLoader = document.getElementById('gridLoader');
     const homeEmpty = document.getElementById('homeEmpty');
     const homeEmptyText = document.getElementById('homeEmptyText');
+
+    // Mini player
+    const miniPlayer = document.getElementById('miniPlayer');
+    const miniFrame = document.getElementById('miniFrame');
+    const miniPlayerTitle = document.getElementById('miniPlayerTitle');
+    const miniExpandBtn = document.getElementById('miniExpandBtn');
+    const miniCloseBtn = document.getElementById('miniCloseBtn');
 
     // Watch view
     const videoFrame = document.getElementById('videoFrame');
@@ -152,6 +161,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function switchView(v) {
+        const leavingWatch = view === 'watch' && v !== 'watch';
+
         view = v;
         setActiveNav(v);
         document.querySelectorAll('.view').forEach(el => {
@@ -163,6 +174,14 @@ document.addEventListener('DOMContentLoaded', () => {
             el.style.display = 'block';
             el.classList.add('active');
         }
+
+        if (leavingWatch && miniVideoData) {
+            activateMiniPlayer();
+        }
+        if (v === 'watch') {
+            deactivateMiniPlayer();
+        }
+
         if (v === 'saved') renderSavedView();
         if (v === 'history') renderHistoryView();
         if (v === 'home') {
@@ -175,6 +194,30 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     }
+
+    function activateMiniPlayer() {
+        const elapsed = watchStartTime ? Math.floor((Date.now() - watchStartTime) / 1000) : 0;
+        const startParam = elapsed > 2 ? `&start=${elapsed}` : '';
+        miniFrame.src = `https://www.youtube-nocookie.com/embed/${miniVideoData.id}?autoplay=1${startParam}&rel=0&modestbranding=1&playsinline=1`;
+        miniPlayerTitle.textContent = miniVideoData.title || '';
+        miniPlayer.style.display = 'block';
+        videoFrame.src = ''; // dừng iframe chính
+    }
+
+    function deactivateMiniPlayer() {
+        miniPlayer.style.display = 'none';
+        miniFrame.src = '';
+    }
+
+    miniExpandBtn.addEventListener('click', () => {
+        if (miniVideoData) openWatch(miniVideoData);
+    });
+
+    miniCloseBtn.addEventListener('click', () => {
+        deactivateMiniPlayer();
+        miniVideoData = null;
+        watchStartTime = null;
+    });
 
     // ── Search input ──
     searchInput.addEventListener('input', () => {
@@ -319,6 +362,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── Watch View ──
     function openWatch(video) {
         currentVideo = video;
+        miniVideoData = video;
+        watchStartTime = Date.now();
         videoFrame.src = `https://www.youtube-nocookie.com/embed/${video.id}?rel=0&modestbranding=1&playsinline=1`;
 
         videoTitle.textContent = video.title || '';
@@ -351,7 +396,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     backBtn.addEventListener('click', () => {
-        videoFrame.src = ''; // Stop video
         switchView('home');
     });
 
