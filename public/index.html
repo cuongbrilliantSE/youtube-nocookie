@@ -1,131 +1,178 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="vi" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouTube Privacy Player - No-Cookie Embed</title>
+    <title>Hush — Xem video riêng tư</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="index.css">
 </head>
 <body>
-    <div class="container">
-        <!-- Warning alert if opened locally via file:// -->
-        <div id="fileWarning" class="alert-warning" style="display: none;">
-            <div>
-                ⚠️ <strong>Cần chạy ứng dụng qua Web Server.</strong>
-            </div>
-            <div>
-                YouTube chặn nhúng video khi mở trực tiếp bằng tệp tin (<code>file://</code>). 
-                Vui lòng khởi động server Node.js bằng cách chạy lệnh sau trong terminal:
-                <br>
-                <code>npm run dev</code>
-            </div>
-        </div>
+    <!-- File protocol warning -->
+    <div class="file-warning" id="fileWarning" style="display:none">
+        ⚠️ <strong>Cần chạy ứng dụng qua Web Server.</strong>
+        YouTube chặn nhúng video khi mở trực tiếp bằng tệp tin (<code>file://</code>).
+        Vui lòng chạy <code>npm run dev</code> trong terminal.
+    </div>
 
-        <header>
-            <h1>
-                <svg width="36" height="36" viewBox="0 0 24 24">
-                    <path d="M23.498 6.163a3.003 3.003 0 0 0-2.11-2.11C19.517 3.545 12 3.545 12 3.545s-7.517 0-9.388.508a3.003 3.003 0 0 0-2.11 2.11C0 8.033 0 12 0 12s0 3.967.502 5.837a3.003 3.003 0 0 0 2.11 2.11c1.871.508 9.388.508 9.388.508s7.517 0 9.388-.508a3.002 3.002 0 0 0 2.11-2.11C24 15.967 24 12 24 12s0-3.967-.502-5.837zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                </svg>
-                YouTube Privacy Player
-            </h1>
-        </header>
-
-        <!-- Main Input Card -->
-        <main class="glass-card">
-            <!-- Platform Selection Tabs -->
-            <div class="platform-tabs">
-                <button class="tab-btn active" id="tabYoutube">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M23.498 6.163a3.003 3.003 0 0 0-2.11-2.11C19.517 3.545 12 3.545 12 3.545s-7.517 0-9.388.508a3.003 3.003 0 0 0-2.11 2.11C0 8.033 0 12 0 12s0 3.967.502 5.837a3.003 3.003 0 0 0 2.11 2.11c1.871.508 9.388.508 9.388.508s7.517 0 9.388-.508a3.002 3.002 0 0 0 2.11-2.11C24 15.967 24 12 24 12s0-3.967-.502-5.837zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                    </svg>
-                    YouTube
-                </button>
-                <button class="tab-btn" id="tabFacebook">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                    </svg>
-                    Facebook Reels
-                </button>
-            </div>
-
-            <div class="input-row">
-                <div class="input-container">
-                    <input type="text" id="urlInput" placeholder="Nhập link YouTube, ID video hoặc từ khóa tìm kiếm..." autocomplete="off">
-                    <button class="clear-btn" id="clearInputBtn" title="Xóa nội dung">&times;</button>
+    <div class="app-shell">
+        <!-- Sidebar -->
+        <nav class="sidebar" id="sidebar">
+            <div class="sidebar-logo">
+                <div class="logo-mark" aria-hidden="true"></div>
+                <div class="logo-text">
+                    <span class="logo-wordmark">Hush</span>
+                    <span class="logo-tagline">Xem video, không bị theo dõi</span>
                 </div>
-                <button class="primary-btn" id="embedBtn">
-                    Nhúng / Tìm kiếm
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="9 18 15 12 9 6"></polyline>
-                    </svg>
+            </div>
+
+            <nav class="sidebar-nav" aria-label="Điều hướng chính">
+                <button class="nav-item active" data-view="home">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                    Trang chủ
                 </button>
-            </div>
+                <button class="nav-item" data-view="saved">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+                    Đã lưu
+                </button>
+                <button class="nav-item" data-view="history">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    Lịch sử
+                </button>
+            </nav>
 
-            <!-- Predefined quick suggestions -->
-            <div class="presets">
-                <span>Gợi ý:</span>
-                <span class="preset-tag" onclick="selectPreset('https://www.youtube.com/watch?v=jfKfPfyJRdk')">Lofi Girl Coding</span>
-                <span class="preset-tag" onclick="selectPreset('https://www.youtube.com/watch?v=dQw4w9WgXcQ')">Rickroll</span>
-                <span class="preset-tag" onclick="selectPreset('https://www.youtube.com/watch?v=EngW7tLk6R8')">Nature 4K Relaxation</span>
-            </div>
-        </main>
+            <div class="sidebar-footer">Lịch sử &amp; danh sách lưu chỉ tồn tại trên thiết bị này.</div>
+        </nav>
 
-        <!-- Error Alert -->
-        <div class="error-toast" id="errorMsg">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="12" y1="8" x2="12" y2="12"></line>
-                <line x1="12" y1="16" x2="12.01" y2="16"></line>
-            </svg>
-            <span>Đường dẫn không hợp lệ. Vui lòng nhập đúng liên kết YouTube hoặc ID video (11 ký tự).</span>
+        <!-- Mobile drawer backdrop -->
+        <div class="drawer-backdrop" id="drawerBackdrop"></div>
+
+        <!-- Main content area -->
+        <div class="main-area">
+            <!-- Top bar -->
+            <header class="top-bar">
+                <button class="hamburger" id="hamburger" aria-label="Mở menu điều hướng">
+                    <span></span><span></span><span></span>
+                </button>
+                <div class="search-wrap">
+                    <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <input type="text" id="searchInput" placeholder="Tìm kiếm video YouTube hoặc dán link..." autocomplete="off">
+                    <button class="search-clear" id="searchClear" aria-label="Xóa tìm kiếm">&times;</button>
+                </div>
+                <div class="privacy-badge">
+                    <span class="accent-dot"></span>
+                    Không cookie · Không theo dõi
+                </div>
+                <div class="theme-toggle-wrap">
+                    <span class="theme-label" id="themeLabel">Tối</span>
+                    <button class="toggle-track" id="themeToggle" role="switch" aria-checked="true" aria-label="Chuyển theme">
+                        <div class="toggle-thumb"></div>
+                    </button>
+                </div>
+            </header>
+
+            <!-- ── View: Home / Search ── -->
+            <section class="view active" id="view-home">
+                <div class="content-area">
+                    <div class="error-toast" id="errorMsg" style="display:none">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        <span id="errorText">Đã có lỗi xảy ra.</span>
+                    </div>
+                    <h2 class="view-heading" id="homeHeading">Dành cho bạn</h2>
+                    <div class="video-grid" id="videoGrid"></div>
+                    <div class="grid-loader" id="gridLoader" style="display:none">
+                        <div class="spinner"></div>
+                        <span>Đang tìm kiếm...</span>
+                    </div>
+                    <div class="empty-state" id="homeEmpty">
+                        <div class="empty-icon">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        </div>
+                        <p id="homeEmptyText">Nhập tên video hoặc từ khóa vào ô tìm kiếm phía trên.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ── View: Watch ── -->
+            <section class="view" id="view-watch" style="display:none">
+                <div class="content-area">
+                    <button class="back-btn" id="backBtn">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                        Quay lại
+                    </button>
+                    <div class="watch-layout" id="watchLayout">
+                        <div class="player-col">
+                            <div class="player-wrap">
+                                <iframe id="videoFrame" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"></iframe>
+                            </div>
+                            <h1 class="video-title" id="videoTitle"></h1>
+                            <div class="video-meta-row">
+                                <div class="meta-left">
+                                    <div class="channel-avatar" id="channelAvatar"></div>
+                                    <div class="meta-info">
+                                        <div class="channel-name" id="channelName"></div>
+                                        <div class="video-stats" id="videoStats"></div>
+                                    </div>
+                                </div>
+                                <div class="meta-right">
+                                    <button class="pill-btn" id="saveBtn">
+                                        <svg class="bookmark-icon" width="14" height="14" viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+                                        <span id="saveBtnText">Lưu</span>
+                                    </button>
+                                    <button class="pill-btn" id="copyBtn">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                        <span id="copyBtnText">Sao chép liên kết riêng tư</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="privacy-strip">
+                                <span class="accent-dot"></span>
+                                Phát qua youtube-nocookie.com — không đặt cookie theo dõi cho đến khi bạn nhấn phát.
+                            </div>
+                        </div>
+                        <aside class="suggested-col" id="suggestedCol">
+                            <h3 class="suggested-heading">Video liên quan</h3>
+                            <div class="suggested-list" id="suggestedList">
+                                <div class="suggested-loader"><div class="spinner small"></div></div>
+                            </div>
+                        </aside>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ── View: Saved ── -->
+            <section class="view" id="view-saved" style="display:none">
+                <div class="content-area">
+                    <h2 class="view-heading">Đã lưu</h2>
+                    <div class="video-grid" id="savedGrid"></div>
+                    <div class="empty-state" id="savedEmpty" style="display:none">
+                        <div class="empty-icon">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+                        </div>
+                        <p>Chưa có video nào được lưu.<br>Nhấn biểu tượng đánh dấu trên video để lưu lại.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ── View: History ── -->
+            <section class="view" id="view-history" style="display:none">
+                <div class="content-area">
+                    <div class="history-heading-row">
+                        <h2 class="view-heading">Lịch sử xem</h2>
+                        <button class="amber-btn" id="clearHistoryBtn" style="display:none">Xóa lịch sử</button>
+                    </div>
+                    <div class="history-rows" id="historyRows"></div>
+                    <div class="empty-state" id="historyEmpty" style="display:none">
+                        <div class="empty-icon">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                        </div>
+                        <p>Chưa có video nào trong lịch sử.</p>
+                    </div>
+                </div>
+            </section>
         </div>
-
-        <!-- Search Results Card -->
-        <section class="glass-card search-section" id="searchWrapper" style="display: none;">
-            <div class="search-header">
-                <h3>Kết quả tìm kiếm</h3>
-                <button class="close-search-btn" id="closeSearchBtn" title="Đóng kết quả tìm kiếm">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                </button>
-            </div>
-            
-            <div class="search-loader" id="searchLoader" style="display: none;">
-                <div class="spinner"></div>
-                <span>Đang tìm kiếm video từ YouTube...</span>
-            </div>
-
-            <div class="search-results-grid" id="searchResultsGrid">
-                <!-- Dynamic Content Loaded from JS -->
-            </div>
-        </section>
-
-        <!-- Video Player Card -->
-        <section class="glass-card video-card" id="videoWrapper">
-            <div class="video-aspect-ratio" id="playerContainer">
-                <iframe id="videoFrame" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"></iframe>
-                <video id="nativeVideoPlayer" controls autoplay style="display: none; width: 100%; height: 100%; object-fit: contain;"></video>
-            </div>
-        </section>
-
-        <!-- History/Library Card -->
-        <section class="glass-card history-section">
-            <div class="history-header">
-                <h3>Lịch sử đã xem</h3>
-                <button class="clear-history-btn" id="clearHistoryBtn">Xóa tất cả</button>
-            </div>
-            <div class="history-list" id="historyList">
-                <!-- Dynamic Content Loaded from JS -->
-            </div>
-        </section>
-
-        <footer>
-            <span>Phát triển bằng Node.js & Express</span>
-            <span>•</span>
-            <a href="https://www.youtube-nocookie.com" target="_blank" rel="noopener noreferrer">YouTube No-Cookie</a>
-        </footer>
     </div>
 
     <script src="app.js"></script>
