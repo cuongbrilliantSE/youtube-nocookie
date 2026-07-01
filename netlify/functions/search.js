@@ -17,7 +17,7 @@ exports.handler = async function (event, context) {
     const videos = (results.videos || []).slice(0, 12).map(v => ({
       id: v.videoId,
       title: v.title,
-      thumbnail: v.thumbnail || v.image,
+      thumbnail: `/api/thumbnail?id=${v.videoId}`,
       duration: v.timestamp || (v.duration ? v.duration.timestamp : ''),
       author: v.author ? v.author.name : '',
       views: v.views,

@@ -318,7 +318,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const isSaved = saved.some(s => s.id === video.id);
         const color = getAvatarColor(video.author);
         const initials = getInitials(video.author);
-        const thumb = video.thumbnail || `https://img.youtube.com/vi/${video.id}/hqdefault.jpg`;
+        const thumb = video.thumbnail || `/api/thumbnail?id=${video.id}`;
         const viewsText = video.views ? `${formatViews(video.views)} lượt xem` : '';
         const statsText = [viewsText, video.ago].filter(Boolean).join(' · ');
 
@@ -385,7 +385,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function openWatchById(id) {
         // Open with minimal info - full meta will load when/if they search
-        openWatch({ id, title: `Video ${id}`, author: '', thumbnail: `https://img.youtube.com/vi/${id}/hqdefault.jpg` });
+        openWatch({ id, title: `Video ${id}`, author: '', thumbnail: `/api/thumbnail?id=${id}` });
     }
 
     function updateSaveBtnState() {
@@ -447,7 +447,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function createSuggestedItem(video) {
         const item = document.createElement('div');
         item.className = 'suggested-item';
-        const thumb = video.thumbnail || `https://img.youtube.com/vi/${video.id}/hqdefault.jpg`;
+        const thumb = video.thumbnail || `/api/thumbnail?id=${video.id}`;
         const viewsText = video.views ? `${formatViews(video.views)} lượt xem` : '';
 
         item.innerHTML = `
@@ -496,7 +496,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function createHistoryRow(item) {
         const row = document.createElement('div');
         row.className = 'history-row';
-        const thumb = item.thumbnail || `https://img.youtube.com/vi/${item.id}/hqdefault.jpg`;
+        const thumb = item.thumbnail || `/api/thumbnail?id=${item.id}`;
         const channelText = item.channel || item.author || '';
         const viewsText = item.views ? `${formatViews(item.views)} lượt xem` : '';
         const subText = [channelText, viewsText].filter(Boolean).join(' · ');
@@ -551,7 +551,7 @@ document.addEventListener('DOMContentLoaded', () => {
             title: video.title || '',
             channel: video.author || '',
             author: video.author || '',
-            thumbnail: video.thumbnail || `https://img.youtube.com/vi/${video.id}/hqdefault.jpg`,
+            thumbnail: video.thumbnail || `/api/thumbnail?id=${video.id}`,
             views: video.views,
             ago: video.ago,
             duration: video.duration,

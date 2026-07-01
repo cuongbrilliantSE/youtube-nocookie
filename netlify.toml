@@ -11,3 +11,8 @@
   from = "/api/search/facebook"
   to = "/.netlify/functions/search-facebook"
   status = 200
+
+[[redirects]]
+  from = "/api/thumbnail"
+  to = "/.netlify/functions/thumbnail"
+  status = 200

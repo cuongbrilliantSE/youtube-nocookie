@@ -30,7 +30,7 @@ app.get('/api/search', async (req, res) => {
     const videos = (results.videos || []).slice(0, 12).map(v => ({
       id: v.videoId,
       title: v.title,
-      thumbnail: v.thumbnail || v.image,
+      thumbnail: `/api/thumbnail?id=${v.videoId}`,
       duration: v.timestamp || (v.duration ? v.duration.timestamp : ''),
       author: v.author ? v.author.name : '',
       views: v.views,
@@ -80,6 +80,45 @@ async function fetchWithTimeout(resource, options = {}) {
   clearTimeout(id);
   return response;
 }
+
+// Thumbnail proxy endpoint — avoids browser CORS/hotlink blocks on i.ytimg.com
+app.get('/api/thumbnail', async (req, res) => {
+  const id = req.query.id;
+  if (!id || !/^[a-zA-Z0-9_-]{11}$/.test(id)) {
+    return res.status(400).send('Invalid video ID');
+  }
+
+  const candidates = [
+    `https://i.ytimg.com/vi/${id}/hq720.jpg`,
+    `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+    `https://img.youtube.com/vi/${id}/hqdefault.jpg`,
+  ];
+
+  for (const url of candidates) {
+    try {
+      const response = await fetchWithTimeout(url, {
+        timeout: 5000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Referer': 'https://www.youtube.com/',
+          'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+        },
+      });
+
+      if (response.ok) {
+        res.setHeader('Content-Type', response.headers.get('content-type') || 'image/jpeg');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        const { Readable } = require('stream');
+        Readable.fromWeb(response.body).pipe(res);
+        return;
+      }
+    } catch (_) {
+      // try next candidate
+    }
+  }
+
+  res.status(404).send('Thumbnail not found');
+});
 
 // Search Facebook Reels API endpoint using multi-engine fallback (Bing, Yahoo, DuckDuckGo)
 app.get('/api/search/facebook', async (req, res) => {
