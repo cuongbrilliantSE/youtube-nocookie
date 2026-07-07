@@ -14,7 +14,7 @@ exports.handler = async function (event, context) {
     }
 
     const results = await yts(query);
-    const videos = (results.videos || []).slice(0, 12).map(v => ({
+    const videos = (results.videos || []).slice(0, 20).map(v => ({
       id: v.videoId,
       title: v.title,
       thumbnail: `/api/thumbnail?id=${v.videoId}`,

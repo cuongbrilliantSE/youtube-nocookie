@@ -421,7 +421,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            data.videos.filter(v => v.id !== video.id).slice(0, 8).forEach(v => {
+            data.videos.filter(v => v.id !== video.id).forEach(v => {
                 suggestedList.appendChild(createSuggestedItem(v));
             });
         } catch (err) {
