@@ -224,20 +224,6 @@ document.addEventListener('DOMContentLoaded', () => {
         query = searchInput.value.trim();
         toggleSearchClear();
         hideError();
-
-        if (view !== 'home') switchView('home');
-
-        if (!query) {
-            homeHeading.textContent = 'Dành cho bạn';
-            showHomeDefault();
-        } else {
-            // Clear old results and prompt user to press Enter
-            videoGrid.innerHTML = '';
-            gridLoader.style.display = 'none';
-            homeHeading.textContent = 'Dành cho bạn';
-            homeEmptyText.textContent = 'Nhấn Enter để tìm kiếm.';
-            homeEmpty.style.display = 'flex';
-        }
     });
 
     searchInput.addEventListener('keydown', e => {
