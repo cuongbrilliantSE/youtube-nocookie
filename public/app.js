@@ -10,6 +10,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let isSearching = false;
     let miniVideoData = null;   // video object currently in mini player
     let watchStartTime = null;  // Date.now() when current video started playing
+    let currentSuggested = []; // related videos loaded for the currently open video
+    let hasAutoAdvanced = false; // guards against firing auto-advance more than once per video
 
     // ── Avatar palette ──
     const AVATAR_COLORS = ['#3FCFC0', '#B58EF0', '#E8A93F', '#5FA8F5', '#6EE7B7', '#F0A8C8'];
@@ -51,6 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const patterns = [
             /(?:youtube\.com\/watch\?(?:.*&)?v=|youtu\.be\/|youtube\.com\/embed\/|youtube-nocookie\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
             /youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/,
+            /youtube\.com\/live\/([a-zA-Z0-9_-]{11})/,
         ];
         for (const p of patterns) {
             const m = input.match(p);
@@ -305,13 +308,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const color = getAvatarColor(video.author);
         const initials = getInitials(video.author);
         const thumb = video.thumbnail || `/api/thumbnail?id=${video.id}`;
-        const viewsText = video.views ? `${formatViews(video.views)} lượt xem` : '';
+        const viewsText = video.views ? `${formatViews(video.views)}${video.isLive ? ' người xem' : ' lượt xem'}` : '';
         const statsText = [viewsText, video.ago].filter(Boolean).join(' · ');
 
         card.innerHTML = `
             <div class="card-thumb-wrap">
                 <img src="${escHtml(thumb)}" alt="${escHtml(video.title)}" loading="lazy">
-                ${video.duration ? `<span class="duration-badge">${escHtml(video.duration)}</span>` : ''}
+                ${video.isLive ? `<span class="live-badge">TRỰC TIẾP</span>` : (video.duration ? `<span class="duration-badge">${escHtml(video.duration)}</span>` : '')}
                 <button class="card-bookmark-btn${isSaved ? ' saved' : ''}" data-id="${escHtml(video.id)}" title="${isSaved ? 'Bỏ lưu' : 'Lưu video'}" aria-label="${isSaved ? 'Bỏ lưu' : 'Lưu video'}">
                     <div class="bookmark-shape"></div>
                 </button>
@@ -350,7 +353,8 @@ document.addEventListener('DOMContentLoaded', () => {
         currentVideo = video;
         miniVideoData = video;
         watchStartTime = Date.now();
-        videoFrame.src = `https://www.youtube-nocookie.com/embed/${video.id}?rel=0&modestbranding=1&playsinline=1`;
+        hasAutoAdvanced = false;
+        videoFrame.src = `https://www.youtube-nocookie.com/embed/${video.id}?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}`;
 
         videoTitle.textContent = video.title || '';
         channelName.textContent = video.author || 'Không rõ kênh';
@@ -367,6 +371,29 @@ document.addEventListener('DOMContentLoaded', () => {
         switchView('watch');
         loadSuggested(video);
         window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Handshake required for the embedded player to start posting playerState updates.
+    videoFrame.addEventListener('load', () => {
+        try {
+            videoFrame.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 'videoFrame' }), '*');
+        } catch (e) { }
+    });
+
+    // Auto-advance: when the current video ends, play the first related video.
+    window.addEventListener('message', (e) => {
+        if (e.source !== videoFrame.contentWindow) return;
+        let data;
+        try { data = JSON.parse(e.data); } catch (err) { return; }
+        if (data.event === 'infoDelivery' && data.info && data.info.playerState === 0 && !hasAutoAdvanced) {
+            hasAutoAdvanced = true;
+            playNextSuggested();
+        }
+    });
+
+    function playNextSuggested() {
+        if (!currentSuggested.length) return;
+        openWatch(currentSuggested[0]);
     }
 
     function openWatchById(id) {
@@ -410,6 +437,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function loadSuggested(video) {
         suggestedList.innerHTML = '<div class="suggested-loader"><div class="spinner small"></div></div>';
+        currentSuggested = [];
         try {
             const q = encodeURIComponent(video.author || video.title || 'music');
             const res = await fetch(`/api/search?q=${q}`);
@@ -421,7 +449,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            data.videos.filter(v => v.id !== video.id).forEach(v => {
+            currentSuggested = data.videos.filter(v => v.id !== video.id).slice(0, 8);
+            currentSuggested.forEach(v => {
                 suggestedList.appendChild(createSuggestedItem(v));
             });
         } catch (err) {
@@ -506,6 +535,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 views: item.views,
                 ago: item.ago,
                 duration: item.duration,
+                isLive: item.isLive || false,
             });
         });
 
@@ -541,6 +571,7 @@ document.addEventListener('DOMContentLoaded', () => {
             views: video.views,
             ago: video.ago,
             duration: video.duration,
+            isLive: video.isLive || false,
             platform: 'youtube',
             url: `https://www.youtube-nocookie.com/embed/${video.id}`,
             timestamp: new Date().toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }),

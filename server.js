@@ -27,17 +27,31 @@ app.get('/api/search', async (req, res) => {
     }
 
     const results = await yts(query);
-    const videos = (results.videos || []).slice(0, 20).map(v => ({
+    const liveVideos = (results.live || [])
+      .filter(v => v.status === 'LIVE')
+      .map(v => ({
+        id: v.videoId,
+        title: v.title,
+        thumbnail: `/api/thumbnail?id=${v.videoId}`,
+        duration: 'LIVE',
+        author: v.author ? v.author.name : '',
+        views: v.watching,
+        ago: '',
+        isLive: true,
+        desc: v.description || '',
+      }));
+    const videos = (results.videos || []).slice(0, 12).map(v => ({
       id: v.videoId,
       title: v.title,
       thumbnail: `/api/thumbnail?id=${v.videoId}`,
       duration: v.timestamp || (v.duration ? v.duration.timestamp : ''),
       author: v.author ? v.author.name : '',
       views: v.views,
-      ago: v.ago
+      ago: v.ago,
+      desc: v.description || '',
     }));
 
-    res.json({ success: true, videos });
+    res.json({ success: true, videos: [...liveVideos, ...videos].slice(0, 12) });
   } catch (error) {
     console.error('Search error:', error);
     res.status(500).json({ error: 'Failed to perform search' });
@@ -48,23 +62,23 @@ app.get('/api/search', async (req, res) => {
 function decodeHtmlEntities(str) {
   if (!str) return '';
   return str.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec))
-            .replace(/&dstrok;/gi, 'đ')
-            .replace(/&Dstrok;/gi, 'Đ')
-            .replace(/&[a-zA-Z0-9]+;/g, (match) => {
-              const entities = {
-                '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&apos;': "'",
-                '&nbsp;': ' ', '&agrave;': 'à', '&aacute;': 'á', '&acirc;': 'â',
-                '&atilde;': 'ã', '&egrave;': 'è', '&eacute;': 'é', '&ecirc;': 'ê',
-                '&igrave;': 'ì', '&iacute;': 'í', '&ograve;': 'ò', '&oacute;': 'ó',
-                '&ocirc;': 'ô', '&otilde;': 'õ', '&ugrave;': 'ù', '&uacute;': 'ú',
-                '&yacute;': 'ý', '&Agrave;': 'À', '&Aacute;': 'Á', '&Acirc;': 'Â',
-                '&Atilde;': 'Ã', '&Egrave;': 'È', '&Eacute;': 'É', '&Ecirc;': 'Ê',
-                '&Igrave;': 'Ì', '&Iacute;': 'Í', '&Ograve;': 'Ò', '&Oacute;': 'Ó',
-                '&Ocirc;': 'Ô', '&Otilde;': 'Õ', '&Ugrave;': 'Ù', '&Uacute;': 'Ú',
-                '&Yacute;': 'Ý', '&deg;': '°'
-              };
-              return entities[match] || match;
-            });
+    .replace(/&dstrok;/gi, 'đ')
+    .replace(/&Dstrok;/gi, 'Đ')
+    .replace(/&[a-zA-Z0-9]+;/g, (match) => {
+      const entities = {
+        '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&apos;': "'",
+        '&nbsp;': ' ', '&agrave;': 'à', '&aacute;': 'á', '&acirc;': 'â',
+        '&atilde;': 'ã', '&egrave;': 'è', '&eacute;': 'é', '&ecirc;': 'ê',
+        '&igrave;': 'ì', '&iacute;': 'í', '&ograve;': 'ò', '&oacute;': 'ó',
+        '&ocirc;': 'ô', '&otilde;': 'õ', '&ugrave;': 'ù', '&uacute;': 'ú',
+        '&yacute;': 'ý', '&Agrave;': 'À', '&Aacute;': 'Á', '&Acirc;': 'Â',
+        '&Atilde;': 'Ã', '&Egrave;': 'È', '&Eacute;': 'É', '&Ecirc;': 'Ê',
+        '&Igrave;': 'Ì', '&Iacute;': 'Í', '&Ograve;': 'Ò', '&Oacute;': 'Ó',
+        '&Ocirc;': 'Ô', '&Otilde;': 'Õ', '&Ugrave;': 'Ù', '&Uacute;': 'Ú',
+        '&Yacute;': 'Ý', '&deg;': '°'
+      };
+      return entities[match] || match;
+    });
 }
 
 // Helper function to fetch with a timeout using AbortController
@@ -72,7 +86,7 @@ async function fetchWithTimeout(resource, options = {}) {
   const { timeout = 3500 } = options;
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
-  
+
   const response = await fetch(resource, {
     ...options,
     signal: controller.signal
@@ -206,8 +220,8 @@ app.get('/api/search/facebook', async (req, res) => {
           if (reelId) {
             // Find titles matching headers or spans, generic fallbacks
             const titleMatch = aContent.match(/<h3[^>]*>([\s\S]*?)<\/h3>/) ||
-                               aContent.match(/<span[^>]*>([\s\S]*?)<\/span>/) ||
-                               [null, ''];
+              aContent.match(/<span[^>]*>([\s\S]*?)<\/span>/) ||
+              [null, ''];
             let title = titleMatch[1] ? titleMatch[1].replace(/<[^>]*>/g, '').trim() : '';
             title = decodeHtmlEntities(title);
             title = title.replace(/\s*-\s*Facebook\s*$/i, '');
@@ -242,7 +256,7 @@ app.get('/api/search/facebook', async (req, res) => {
   }
 
   console.error('All search engines failed to return results.');
-  res.status(500).json({ 
+  res.status(500).json({
     error: 'Failed to perform Facebook search on all engines',
     details: lastError ? lastError.message : 'Unknown network error'
   });
@@ -262,7 +276,7 @@ app.get('/api/video/facebook', (req, res) => {
 
   // Set response headers for direct MP4 stream
   res.setHeader('Content-Type', 'video/mp4');
-  
+
   // Spawn yt-dlp process to stream video directly to stdout
   const { spawn } = require('child_process');
   const child = spawn('yt-dlp', [
