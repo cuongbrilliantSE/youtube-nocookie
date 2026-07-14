@@ -14,6 +14,19 @@ exports.handler = async function (event, context) {
     }
 
     const results = await yts(query);
+    const liveVideos = (results.live || [])
+      .filter(v => v.status === 'LIVE')
+      .map(v => ({
+        id: v.videoId,
+        title: v.title,
+        thumbnail: `/api/thumbnail?id=${v.videoId}`,
+        duration: 'LIVE',
+        author: v.author ? v.author.name : '',
+        views: v.watching,
+        ago: '',
+        isLive: true,
+        desc: v.description || '',
+      }));
     const videos = (results.videos || []).slice(0, 12).map(v => ({
       id: v.videoId,
       title: v.title,
@@ -21,7 +34,8 @@ exports.handler = async function (event, context) {
       duration: v.timestamp || (v.duration ? v.duration.timestamp : ''),
       author: v.author ? v.author.name : '',
       views: v.views,
-      ago: v.ago
+      ago: v.ago,
+      desc: v.description || '',
     }));
 
     return {
@@ -30,7 +44,7 @@ exports.handler = async function (event, context) {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
       },
-      body: JSON.stringify({ success: true, videos }),
+      body: JSON.stringify({ success: true, videos: [...liveVideos, ...videos].slice(0, 12) }),
     };
   } catch (error) {
     console.error('Search error:', error);
