@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let watchStartTime = null;  // Date.now() when current video started playing
     let currentSuggested = []; // related videos loaded for the currently open video
     let hasAutoAdvanced = false; // guards against firing auto-advance more than once per video
+    let currentChannelFilter = null; // name of the channel currently being filtered
 
     // ── Avatar palette ──
     const AVATAR_COLORS = ['#3FCFC0', '#B58EF0', '#E8A93F', '#5FA8F5', '#6EE7B7', '#F0A8C8'];
@@ -131,6 +132,12 @@ document.addEventListener('DOMContentLoaded', () => {
         applyTheme();
     });
 
+    channelName.addEventListener('click', () => {
+        if (currentVideo && currentVideo.author) {
+            searchChannel(currentVideo.author, currentVideo.authorUrl);
+        }
+    });
+
     // ── Mobile nav ──
     hamburger.addEventListener('click', () => {
         sidebar.classList.add('open');
@@ -149,9 +156,14 @@ document.addEventListener('DOMContentLoaded', () => {
         item.addEventListener('click', () => {
             const target = item.dataset.view;
             if (target !== 'home') {
-                // Clear search when navigating away
                 searchInput.value = '';
                 query = '';
+                currentChannelFilter = null;
+                toggleSearchClear();
+            } else {
+                searchInput.value = '';
+                query = '';
+                currentChannelFilter = null;
                 toggleSearchClear();
             }
             switchView(target);
@@ -231,6 +243,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     searchInput.addEventListener('keydown', e => {
         if (e.key !== 'Enter' || !query) return;
+        currentChannelFilter = null;
         if (view !== 'home') switchView('home');
         const directId = extractVideoId(query);
         if (directId) {
@@ -243,6 +256,7 @@ document.addEventListener('DOMContentLoaded', () => {
     searchClear.addEventListener('click', () => {
         searchInput.value = '';
         query = '';
+        currentChannelFilter = null;
         toggleSearchClear();
         homeHeading.textContent = 'Dành cho bạn';
         showHomeDefault();
@@ -251,6 +265,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function toggleSearchClear() {
         searchClear.classList.toggle('visible', searchInput.value.length > 0);
+    }
+
+    function searchChannel(name, url) {
+        if (!name) return;
+        
+        let q = `"${name}"`;
+        if (url) {
+            const handleMatch = url.match(/@([a-zA-Z0-9_-]+)/);
+            if (handleMatch) {
+                q = `@${handleMatch[1]}`;
+            }
+        }
+        
+        currentChannelFilter = name;
+        searchInput.value = q;
+        query = q;
+        toggleSearchClear();
+        switchView('home');
+        doSearch(q);
     }
 
     // ── Search API ──
@@ -276,7 +309,20 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             searchResults = data.videos;
-            homeHeading.textContent = `Kết quả cho "${q}"`;
+            if (currentChannelFilter) {
+                const target = currentChannelFilter.toLowerCase().trim();
+                const filtered = searchResults.filter(v => {
+                    if (!v.author) return false;
+                    const author = v.author.toLowerCase().trim();
+                    return author === target || author.includes(target) || target.includes(author);
+                });
+                if (filtered.length > 0) {
+                    searchResults = filtered;
+                }
+                homeHeading.textContent = `Kênh: ${currentChannelFilter}`;
+            } else {
+                homeHeading.textContent = `Kết quả cho "${q}"`;
+            }
             renderVideoGrid(videoGrid, searchResults);
         } catch (err) {
             console.error(err);
@@ -287,6 +333,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showHomeDefault() {
+        currentChannelFilter = null;
         videoGrid.innerHTML = '';
         gridLoader.style.display = 'none';
         homeEmptyText.textContent = 'Nhập tên video hoặc từ khóa vào ô tìm kiếm phía trên.';
@@ -344,6 +391,14 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (currentVideo && currentVideo.id === video.id) updateSaveBtnState();
         });
+
+        const channelBtn = card.querySelector('.card-channel');
+        if (channelBtn && video.author) {
+            channelBtn.addEventListener('click', e => {
+                e.stopPropagation();
+                searchChannel(video.author, video.authorUrl);
+            });
+        }
 
         return card;
     }
@@ -477,6 +532,15 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>`;
 
         item.addEventListener('click', () => openWatch(video));
+
+        const channelBtn = item.querySelector('.suggested-channel');
+        if (channelBtn && video.author) {
+            channelBtn.addEventListener('click', e => {
+                e.stopPropagation();
+                searchChannel(video.author, video.authorUrl);
+            });
+        }
+
         return item;
     }
 
