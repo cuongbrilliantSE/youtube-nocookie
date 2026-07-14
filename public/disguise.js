@@ -37,6 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let tickTimer = null;
     let searchDebounce = null;
     const playerPanes = {}; // videoId -> pane element, kept alive in the DOM so playback survives tab switches
+    let advancedForId = null; // guards against auto-advancing more than once for the same "ended" video
 
     // ── Helpers ──
     function escHtml(str) {
@@ -367,7 +368,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const pane = document.createElement('div');
             pane.className = 'vc-player-pane';
             pane.style.cssText = 'flex:1;min-height:0;display:flex;flex-direction:column';
-            const embedUrl = `https://www.youtube-nocookie.com/embed/${v.id}?rel=0&modestbranding=1&playsinline=1&autoplay=1`;
+            const embedUrl = `https://www.youtube-nocookie.com/embed/${v.id}?rel=0&modestbranding=1&playsinline=1&autoplay=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}`;
             pane.innerHTML = `
                 <div class="vc-browser-toolbar">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--vcTextMuted)"><path d="M15 5l-7 7 7 7"/></svg>
@@ -380,6 +381,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>`;
             host.appendChild(pane);
             playerPanes[v.id] = pane;
+
+            const iframe = pane.querySelector('iframe');
+            iframe.addEventListener('load', () => {
+                try { iframe.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: v.id }), '*'); } catch (e) {}
+            });
         }
 
         // Show only the active pane; inactive ones stay mounted (and keep playing) in the background.
@@ -571,6 +577,22 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         window.addEventListener('resize', () => { if (D.active) renderSidebar(); });
+
+        // Auto-advance: when the active tab's video ends, open its first related video.
+        window.addEventListener('message', (e) => {
+            if (!D.active) return;
+            let data;
+            try { data = JSON.parse(e.data); } catch (err) { return; }
+            if (data.event !== 'infoDelivery' || !data.info || data.info.playerState !== 0) return;
+            const endedId = Object.keys(playerPanes).find(id => {
+                const f = playerPanes[id].querySelector('iframe');
+                return f && f.contentWindow === e.source;
+            });
+            if (!endedId || endedId !== D.activeTabId || endedId === advancedForId) return;
+            advancedForId = endedId;
+            const related = D.relatedCache[endedId] || [];
+            if (related.length) openFile(related[0]);
+        });
     }
 
     // ── Mode switching ──
