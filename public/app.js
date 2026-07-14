@@ -10,6 +10,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let isSearching = false;
     let miniVideoData = null;   // video object currently in mini player
     let watchStartTime = null;  // Date.now() when current video started playing
+    let currentSuggested = []; // related videos loaded for the currently open video
+    let hasAutoAdvanced = false; // guards against firing auto-advance more than once per video
 
     // ── Avatar palette ──
     const AVATAR_COLORS = ['#3FCFC0', '#B58EF0', '#E8A93F', '#5FA8F5', '#6EE7B7', '#F0A8C8'];
@@ -351,7 +353,8 @@ document.addEventListener('DOMContentLoaded', () => {
         currentVideo = video;
         miniVideoData = video;
         watchStartTime = Date.now();
-        videoFrame.src = `https://www.youtube-nocookie.com/embed/${video.id}?rel=0&modestbranding=1&playsinline=1`;
+        hasAutoAdvanced = false;
+        videoFrame.src = `https://www.youtube-nocookie.com/embed/${video.id}?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}`;
 
         videoTitle.textContent = video.title || '';
         channelName.textContent = video.author || 'Không rõ kênh';
@@ -368,6 +371,29 @@ document.addEventListener('DOMContentLoaded', () => {
         switchView('watch');
         loadSuggested(video);
         window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Handshake required for the embedded player to start posting playerState updates.
+    videoFrame.addEventListener('load', () => {
+        try {
+            videoFrame.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 'videoFrame' }), '*');
+        } catch (e) {}
+    });
+
+    // Auto-advance: when the current video ends, play the first related video.
+    window.addEventListener('message', (e) => {
+        if (e.source !== videoFrame.contentWindow) return;
+        let data;
+        try { data = JSON.parse(e.data); } catch (err) { return; }
+        if (data.event === 'infoDelivery' && data.info && data.info.playerState === 0 && !hasAutoAdvanced) {
+            hasAutoAdvanced = true;
+            playNextSuggested();
+        }
+    });
+
+    function playNextSuggested() {
+        if (!currentSuggested.length) return;
+        openWatch(currentSuggested[0]);
     }
 
     function openWatchById(id) {
@@ -411,6 +437,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function loadSuggested(video) {
         suggestedList.innerHTML = '<div class="suggested-loader"><div class="spinner small"></div></div>';
+        currentSuggested = [];
         try {
             const q = encodeURIComponent(video.author || video.title || 'music');
             const res = await fetch(`/api/search?q=${q}`);
@@ -422,7 +449,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            data.videos.filter(v => v.id !== video.id).slice(0, 8).forEach(v => {
+            currentSuggested = data.videos.filter(v => v.id !== video.id).slice(0, 8);
+            currentSuggested.forEach(v => {
                 suggestedList.appendChild(createSuggestedItem(v));
             });
         } catch (err) {
@@ -491,69 +519,7 @@ document.addEventListener('DOMContentLoaded', () => {
         row.innerHTML = `
             <div class="history-row-thumb">
                 <img src="${escHtml(thumb)}" alt="${escHtml(item.title || '')}" loading="lazy">
-            </div>document.addEventListener('DOMContentLoaded', () => {
-    // ── State ──
-    let theme = localStorage.getItem('hush_theme') || 'dark';
-    let view = 'home';
-    let query = '';
-    let currentVideo = null;
-    let saved = JSON.parse(localStorage.getItem('hush_saved_v1')) || [];
-    let history = JSON.parse(localStorage.getItem('yt_embed_history')) || [];
-    let searchResults = [];
-    let isSearching = false;
-    let miniVideoData = null;   // video object currently in mini player
-    let watchStartTime = null;  // Date.now() when current video started playing
-
-    // ── Avatar palette ──
-    const AVATAR_COLORS = ['#3FCFC0', '#B58EF0', '#E8A93F', '#5FA8F5', '#6EE7B7', '#F0A8C8'];
-
-    function getAvatarColor(name) {
-        if (!name) return AVATAR_COLORS[0];
-        let h = 0;
-        for (let i = 0; i < name.length; i++) h = (h + name.charCodeAt(i)) % AVATAR_COLORS.length;
-        return AVATAR_COLORS[h];
-    }
-
-    function getInitials(name) {
-        if (!name) return '?';
-        const w = name.trim().split(/\s+/);
-        if (w.length === 1) return w[0].slice(0, 2).toUpperCase();
-        return (w[0][0] + w[w.length - 1][0]).toUpperCase();
-    }
-
-    function formatViews(views) {
-        if (!views) return '';
-        if (views >= 1000000) return (views / 1000000).toFixed(1).replace('.0', '') + 'Tr';
-        if (views >= 1000) return (views / 1000).toFixed(1).replace('.0', '') + 'N';
-        return String(views);
-    }
-
-    function escHtml(str) {
-        if (!str && str !== 0) return '';
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
-    }
-
-    function extractVideoId(input) {
-        if (!input) return null;
-        input = input.trim();
-        const patterns = [
-            /(?:youtube\.com\/watch\?(?:.*&)?v=|youtu\.be\/|youtube\.com\/embed\/|youtube-nocookie\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
-            /youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/,
-        ];
-        for (const p of patterns) {
-            const m = input.match(p);
-            if (m) return m[1];
-        }
-        if (/^[a-zA-Z0-9_-]{11}$/.test(input)) return input;
-        return null;
-    }
-
-
+            </div>
             <div class="history-row-info">
                 <div class="history-row-title">${escHtml(item.title || `Video ID: ${item.id}`)}</div>
                 ${subText ? `<div class="history-row-sub">${escHtml(subText)}</div>` : ''}
