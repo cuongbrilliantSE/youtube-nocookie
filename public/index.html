@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="index.css">
+    <link rel="stylesheet" href="disguise.css">
 </head>
 <body>
     <!-- File protocol warning -->
@@ -42,6 +43,11 @@
                     Lịch sử
                 </button>
             </nav>
+
+            <button class="disguise-toggle-btn" id="disguiseToggleBtn" title="Chế độ ngụy trang (Ctrl+Shift+H)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                Chế độ ngụy trang
+            </button>
 
             <div class="sidebar-footer">Lịch sử &amp; danh sách lưu chỉ tồn tại trên thiết bị này.</div>
         </nav>
@@ -191,6 +197,10 @@
         <iframe id="miniFrame" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture"></iframe>
     </div>
 
+    <!-- ── Disguise Mode (fake VS Code shell) ── -->
+    <div id="disguiseRoot" style="display:none"></div>
+
     <script src="app.js"></script>
+    <script src="disguise.js"></script>
 </body>
 </html>
