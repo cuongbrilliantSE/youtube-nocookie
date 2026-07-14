@@ -27,6 +27,19 @@ app.get('/api/search', async (req, res) => {
     }
 
     const results = await yts(query);
+    const liveVideos = (results.live || [])
+      .filter(v => v.status === 'LIVE')
+      .map(v => ({
+        id: v.videoId,
+        title: v.title,
+        thumbnail: `/api/thumbnail?id=${v.videoId}`,
+        duration: 'LIVE',
+        author: v.author ? v.author.name : '',
+        views: v.watching,
+        ago: '',
+        isLive: true,
+        desc: v.description || '',
+      }));
     const videos = (results.videos || []).slice(0, 12).map(v => ({
       id: v.videoId,
       title: v.title,
@@ -34,10 +47,11 @@ app.get('/api/search', async (req, res) => {
       duration: v.timestamp || (v.duration ? v.duration.timestamp : ''),
       author: v.author ? v.author.name : '',
       views: v.views,
-      ago: v.ago
+      ago: v.ago,
+      desc: v.description || '',
     }));
 
-    res.json({ success: true, videos });
+    res.json({ success: true, videos: [...liveVideos, ...videos].slice(0, 12) });
   } catch (error) {
     console.error('Search error:', error);
     res.status(500).json({ error: 'Failed to perform search' });
