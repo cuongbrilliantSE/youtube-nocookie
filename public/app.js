@@ -51,6 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const patterns = [
             /(?:youtube\.com\/watch\?(?:.*&)?v=|youtu\.be\/|youtube\.com\/embed\/|youtube-nocookie\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
             /youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/,
+            /youtube\.com\/live\/([a-zA-Z0-9_-]{11})/,
         ];
         for (const p of patterns) {
             const m = input.match(p);
@@ -305,13 +306,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const color = getAvatarColor(video.author);
         const initials = getInitials(video.author);
         const thumb = video.thumbnail || `/api/thumbnail?id=${video.id}`;
-        const viewsText = video.views ? `${formatViews(video.views)} lượt xem` : '';
+        const viewsText = video.views ? `${formatViews(video.views)}${video.isLive ? ' người xem' : ' lượt xem'}` : '';
         const statsText = [viewsText, video.ago].filter(Boolean).join(' · ');
 
         card.innerHTML = `
             <div class="card-thumb-wrap">
                 <img src="${escHtml(thumb)}" alt="${escHtml(video.title)}" loading="lazy">
-                ${video.duration ? `<span class="duration-badge">${escHtml(video.duration)}</span>` : ''}
+                ${video.isLive ? `<span class="live-badge">TRỰC TIẾP</span>` : (video.duration ? `<span class="duration-badge">${escHtml(video.duration)}</span>` : '')}
                 <button class="card-bookmark-btn${isSaved ? ' saved' : ''}" data-id="${escHtml(video.id)}" title="${isSaved ? 'Bỏ lưu' : 'Lưu video'}" aria-label="${isSaved ? 'Bỏ lưu' : 'Lưu video'}">
                     <div class="bookmark-shape"></div>
                 </button>
@@ -490,7 +491,69 @@ document.addEventListener('DOMContentLoaded', () => {
         row.innerHTML = `
             <div class="history-row-thumb">
                 <img src="${escHtml(thumb)}" alt="${escHtml(item.title || '')}" loading="lazy">
-            </div>
+            </div>document.addEventListener('DOMContentLoaded', () => {
+    // ── State ──
+    let theme = localStorage.getItem('hush_theme') || 'dark';
+    let view = 'home';
+    let query = '';
+    let currentVideo = null;
+    let saved = JSON.parse(localStorage.getItem('hush_saved_v1')) || [];
+    let history = JSON.parse(localStorage.getItem('yt_embed_history')) || [];
+    let searchResults = [];
+    let isSearching = false;
+    let miniVideoData = null;   // video object currently in mini player
+    let watchStartTime = null;  // Date.now() when current video started playing
+
+    // ── Avatar palette ──
+    const AVATAR_COLORS = ['#3FCFC0', '#B58EF0', '#E8A93F', '#5FA8F5', '#6EE7B7', '#F0A8C8'];
+
+    function getAvatarColor(name) {
+        if (!name) return AVATAR_COLORS[0];
+        let h = 0;
+        for (let i = 0; i < name.length; i++) h = (h + name.charCodeAt(i)) % AVATAR_COLORS.length;
+        return AVATAR_COLORS[h];
+    }
+
+    function getInitials(name) {
+        if (!name) return '?';
+        const w = name.trim().split(/\s+/);
+        if (w.length === 1) return w[0].slice(0, 2).toUpperCase();
+        return (w[0][0] + w[w.length - 1][0]).toUpperCase();
+    }
+
+    function formatViews(views) {
+        if (!views) return '';
+        if (views >= 1000000) return (views / 1000000).toFixed(1).replace('.0', '') + 'Tr';
+        if (views >= 1000) return (views / 1000).toFixed(1).replace('.0', '') + 'N';
+        return String(views);
+    }
+
+    function escHtml(str) {
+        if (!str && str !== 0) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function extractVideoId(input) {
+        if (!input) return null;
+        input = input.trim();
+        const patterns = [
+            /(?:youtube\.com\/watch\?(?:.*&)?v=|youtu\.be\/|youtube\.com\/embed\/|youtube-nocookie\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+            /youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/,
+        ];
+        for (const p of patterns) {
+            const m = input.match(p);
+            if (m) return m[1];
+        }
+        if (/^[a-zA-Z0-9_-]{11}$/.test(input)) return input;
+        return null;
+    }
+
+
             <div class="history-row-info">
                 <div class="history-row-title">${escHtml(item.title || `Video ID: ${item.id}`)}</div>
                 ${subText ? `<div class="history-row-sub">${escHtml(subText)}</div>` : ''}
@@ -506,6 +569,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 views: item.views,
                 ago: item.ago,
                 duration: item.duration,
+                isLive: item.isLive || false,
             });
         });
 
@@ -541,6 +605,7 @@ document.addEventListener('DOMContentLoaded', () => {
             views: video.views,
             ago: video.ago,
             duration: video.duration,
+            isLive: video.isLive || false,
             platform: 'youtube',
             url: `https://www.youtube-nocookie.com/embed/${video.id}`,
             timestamp: new Date().toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }),
