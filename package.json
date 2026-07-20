@@ -6,9 +6,16 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "cap:sync": "cap sync",
+    "cap:open:android": "cap open android",
+    "cap:open:ios": "cap open ios"
   },
   "dependencies": {
+    "@capacitor/android": "^6.2.1",
+    "@capacitor/cli": "^6.2.1",
+    "@capacitor/core": "^6.2.1",
+    "@capacitor/ios": "^6.2.1",
     "express": "^4.19.2",
     "yt-search": "^2.13.1"
   },

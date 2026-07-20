@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSuggested = []; // related videos loaded for the currently open video
     let hasAutoAdvanced = false; // guards against firing auto-advance more than once per video
     let currentChannelFilter = null; // name of the channel currently being filtered
+    const API_BASE = (location.hostname === 'localhost' && location.port !== '') ? '' : 'https://jolly-mousse-2aec3a.netlify.app';
 
     // ── Avatar palette ──
     const AVATAR_COLORS = ['#3FCFC0', '#B58EF0', '#E8A93F', '#5FA8F5', '#6EE7B7', '#F0A8C8'];
@@ -296,7 +297,7 @@ document.addEventListener('DOMContentLoaded', () => {
         hideError();
 
         try {
-            const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+            const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(q)}`);
             const data = await res.json();
             gridLoader.style.display = 'none';
             isSearching = false;
@@ -354,7 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const isSaved = saved.some(s => s.id === video.id);
         const color = getAvatarColor(video.author);
         const initials = getInitials(video.author);
-        const thumb = video.thumbnail || `/api/thumbnail?id=${video.id}`;
+        const thumb = video.thumbnail || `${API_BASE}/api/thumbnail?id=${video.id}`;
         const viewsText = video.views ? `${formatViews(video.views)}${video.isLive ? ' người xem' : ' lượt xem'}` : '';
         const statsText = [viewsText, video.ago].filter(Boolean).join(' · ');
 
@@ -453,7 +454,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function openWatchById(id) {
         // Open with minimal info - full meta will load when/if they search
-        openWatch({ id, title: `Video ${id}`, author: '', thumbnail: `/api/thumbnail?id=${id}` });
+        openWatch({ id, title: `Video ${id}`, author: '', thumbnail: `${API_BASE}/api/thumbnail?id=${id}` });
     }
 
     function updateSaveBtnState() {
@@ -495,7 +496,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentSuggested = [];
         try {
             const q = encodeURIComponent(video.author || video.title || 'music');
-            const res = await fetch(`/api/search?q=${q}`);
+            const res = await fetch(`${API_BASE}/api/search?q=${q}`);
             const data = await res.json();
 
             suggestedList.innerHTML = '';
@@ -517,7 +518,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function createSuggestedItem(video) {
         const item = document.createElement('div');
         item.className = 'suggested-item';
-        const thumb = video.thumbnail || `/api/thumbnail?id=${video.id}`;
+        const thumb = video.thumbnail || `${API_BASE}/api/thumbnail?id=${video.id}`;
         const viewsText = video.views ? `${formatViews(video.views)} lượt xem` : '';
 
         item.innerHTML = `
@@ -575,7 +576,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function createHistoryRow(item) {
         const row = document.createElement('div');
         row.className = 'history-row';
-        const thumb = item.thumbnail || `/api/thumbnail?id=${item.id}`;
+        const thumb = item.thumbnail || `${API_BASE}/api/thumbnail?id=${item.id}`;
         const channelText = item.channel || item.author || '';
         const viewsText = item.views ? `${formatViews(item.views)} lượt xem` : '';
         const subText = [channelText, viewsText].filter(Boolean).join(' · ');
@@ -631,7 +632,7 @@ document.addEventListener('DOMContentLoaded', () => {
             title: video.title || '',
             channel: video.author || '',
             author: video.author || '',
-            thumbnail: video.thumbnail || `/api/thumbnail?id=${video.id}`,
+            thumbnail: video.thumbnail || `${API_BASE}/api/thumbnail?id=${video.id}`,
             views: video.views,
             ago: video.ago,
             duration: video.duration,
