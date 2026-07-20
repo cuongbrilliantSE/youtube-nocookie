@@ -10,8 +10,9 @@ workflows:
     triggering:
       events:
         - push
-      watched_branches:
-        - main
+      branch_patterns:
+        - pattern: 'main'
+          include: true
     scripts:
       - name: Install npm dependencies
         script: npm install
@@ -37,8 +38,9 @@ workflows:
     triggering:
       events:
         - push
-      watched_branches:
-        - main
+      branch_patterns:
+        - pattern: 'main'
+          include: true
     scripts:
       - name: Install npm dependencies
         script: npm install
