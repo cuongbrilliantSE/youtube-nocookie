@@ -1,5 +1,5 @@
 diff --git a/node_modules/yt-search/dist/yt-search.js b/node_modules/yt-search/dist/yt-search.js
-index 3e65db0..1c75ceb 100644
+index 3e65db0..60bf3ff 100644
 --- a/node_modules/yt-search/dist/yt-search.js
 +++ b/node_modules/yt-search/dist/yt-search.js
 @@ -278,11 +278,25 @@ function getSearchResults(_options, callback) {
@@ -29,6 +29,15 @@ index 3e65db0..1c75ceb 100644
    };
    debug(params);
    debug('getting results: ' + _options.currentPage);
+@@ -452,7 +466,7 @@ function _parseSearchResultInitialData(responseText, callback) {
+ 
+             // publish/upload date
+             var agoText = _jp.value(item, '$..publishedTimeText..text') || _jp.value(item, '$..publishedTimeText..simpleText');
+-            var viewCountText = _jp.value(item, '$..viewCountText..text') || _jp.value(item, '$..viewCountText..simpleText') || "0";
++            var viewCountText = String(_jp.value(item, '$..viewCountText..text') || _jp.value(item, '$..viewCountText..simpleText') || "0");
+             var viewsCount = Number(viewCountText.split(/\s+/)[0].split(/[,.]/).join('').trim());
+             var lengthText = _jp.value(item, '$..lengthText..text') || _jp.value(item, '$..lengthText..simpleText');
+             var duration = _parseDuration(lengthText || '0:00');
 @@ -465,7 +479,7 @@ function _parseSearchResultInitialData(responseText, callback) {
                type: 'video',
                videoId: videoId,
@@ -47,6 +56,15 @@ index 3e65db0..1c75ceb 100644
                image: _thumbnail,
                thumbnail: _thumbnail,
                videoCount: Number(_parseNumbers(video_count_label)[0]) || video_count,
+@@ -549,7 +563,7 @@ function _parseSearchResultInitialData(responseText, callback) {
+             var _author_name2 = _jp.value(item, '$..shortBylineText..text') || _jp.value(item, '$..longBylineText..text') || _jp.value(item, '$..displayName..text') || _jp.value(item, '$..displayName..simpleText');
+             var about_channel = _jp.query(item, '$..channelRenderer..descriptionSnippet..text').join('') || '';
+             var _video_count_label = _jp.value(item, '$..videoCountText..simpleText') || _jp.value(item, '$..videoCountText..label') || _jp.value(item, '$..videoCountText..text') || '0';
+-            var channel_verified_label = _jp.value(item, '$..channelRenderer..ownerBadges..style') || _jp.value(item, '$..channelRenderer..ownerBadges..tooltip') || _jp.value(item, '$..channelRenderer..ownerBadges..label') || '';
++            var channel_verified_label = String(_jp.value(item, '$..channelRenderer..ownerBadges..style') || _jp.value(item, '$..channelRenderer..ownerBadges..tooltip') || _jp.value(item, '$..channelRenderer..ownerBadges..label') || '');
+             var channel_verified =
+             // has "verified" or "_verified" text in it
+             channel_verified_label.toLowerCase().trim().search(/[\s_]?verified/) >= 0;
 @@ -579,7 +593,7 @@ function _parseSearchResultInitialData(responseText, callback) {
                url: TEMPLATES.YT + base_url,
                baseUrl: base_url,
@@ -65,3 +83,14 @@ index 3e65db0..1c75ceb 100644
                description: _description,
                image: _thumbnail3,
                thumbnail: _thumbnail3,
+@@ -966,9 +980,7 @@ function _parsePlaylistLastUpdateTime(lastUpdateLabel) {
+   debug('fn: _parsePlaylistLastUpdateTime');
+   var DAY_IN_MS = 1000 * 60 * 60 * 24;
+   try {
+-    // ex "Last Updated on Jun 25, 2018"
+-    // ex: "Viimeksi päivitetty 25.6.2018"
+-
++    lastUpdateLabel = String(lastUpdateLabel || '');
+     var words = lastUpdateLabel.toLowerCase().trim().split(/[\s.-]+/);
+     if (words.length > 0) {
+       var lastWord = words[words.length - 1].toLowerCase();
