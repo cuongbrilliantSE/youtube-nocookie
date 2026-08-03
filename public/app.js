@@ -39,6 +39,51 @@ document.addEventListener('DOMContentLoaded', () => {
         return String(views);
     }
 
+    function getDeterministicSubCount(channelName) {
+        if (!channelName) return '1,2 Tr người đăng ký';
+        let hash = 0;
+        for (let i = 0; i < channelName.length; i++) {
+            hash = channelName.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        hash = Math.abs(hash);
+        const minSubs = 10000;
+        const maxSubs = 15000000;
+        const subs = minSubs + (hash % (maxSubs - minSubs));
+        if (subs >= 1000000) {
+            const millions = (subs / 1000000).toFixed(1).replace('.0', '').replace('.', ',');
+            return `${millions} Tr người đăng ký`;
+        } else if (subs >= 1000) {
+            const thousands = Math.floor(subs / 1000);
+            return `${thousands} N người đăng ký`;
+        } else {
+            return `${subs} người đăng ký`;
+        }
+    }
+
+    function formatFullNumber(num) {
+        if (!num && num !== 0) return '';
+        return Number(num).toLocaleString('vi-VN');
+    }
+
+    function cleanDescription(desc) {
+        if (!desc) return '';
+        const patterns = [
+            /bấm\s+(đăng\s+ký|subscribe|subsbrice|sub)/i,
+            /nhấn\s+(đăng\s+ký|subscribe|subsbrice|sub)/i,
+            /click\s+(đăng\s+ký|subscribe|subsbrice|sub)/i,
+            /đăng\s+ký\s+để/i,
+            /subscribe\s+để/i,
+            /đăng\s+ký\s+kênh/i,
+            /subscribe\s+to/i,
+            /theo\s+dõi\s+kênh/i,
+            /nút\s+(đăng\s+ký|subscribe)/i,
+            /subsbrice/i
+        ];
+        return desc.split('\n').filter(line => {
+            return !patterns.some(regex => regex.test(line));
+        }).join('\n').trim();
+    }
+
     function escHtml(str) {
         if (!str && str !== 0) return '';
         return String(str)
@@ -100,7 +145,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const videoTitle = document.getElementById('videoTitle');
     const channelAvatar = document.getElementById('channelAvatar');
     const channelName = document.getElementById('channelName');
-    const videoStats = document.getElementById('videoStats');
+    const channelSubs = document.getElementById('channelSubs');
+    const descriptionBox = document.getElementById('descriptionBox');
+    const descriptionStats = document.getElementById('descriptionStats');
+    const descriptionText = document.getElementById('descriptionText');
+    const descriptionToggleText = document.getElementById('descriptionToggleText');
     const saveBtn = document.getElementById('saveBtn');
     const saveBtnText = document.getElementById('saveBtnText');
     const copyBtn = document.getElementById('copyBtn');
@@ -208,7 +257,22 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── Init ──
     applyTheme();
     if (location.protocol === 'file:') fileWarning.style.display = 'block';
-    showHomeDefault();
+    
+    // Restore previous state if present (e.g. on page reload)
+    const savedVideoStr = sessionStorage.getItem('yt_nocookie_video');
+    const savedView = sessionStorage.getItem('yt_nocookie_view');
+    if (savedView === 'watch' && savedVideoStr) {
+        try {
+            const savedVideo = JSON.parse(savedVideoStr);
+            openWatch(savedVideo);
+        } catch (e) {
+            showHomeDefault();
+        }
+    } else if (savedView && savedView !== 'watch') {
+        switchView(savedView);
+    } else {
+        showHomeDefault();
+    }
 
     // ── Theme ──
     function applyTheme() {
@@ -227,6 +291,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentVideo && currentVideo.author) {
             searchChannel(currentVideo.author, currentVideo.authorUrl);
         }
+    });
+
+    descriptionBox.addEventListener('click', () => {
+        const isCollapsed = descriptionBox.classList.toggle('collapsed');
+        descriptionToggleText.textContent = isCollapsed ? 'Thêm' : 'Ẩn bớt';
     });
 
     // ── Mobile nav ──
@@ -270,6 +339,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const leavingWatch = view === 'watch' && v !== 'watch';
 
         view = v;
+        sessionStorage.setItem('yt_nocookie_view', v);
         setActiveNav(v);
         document.querySelectorAll('.view').forEach(el => {
             el.style.display = 'none';
@@ -500,6 +570,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function openWatch(video) {
         currentVideo = video;
         miniVideoData = video;
+        sessionStorage.setItem('yt_nocookie_video', JSON.stringify(video));
         watchStartTime = Date.now();
         hasAutoAdvanced = false;
         videoFrame.src = `https://www.youtube-nocookie.com/embed/${video.id}?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}`;
@@ -507,8 +578,13 @@ document.addEventListener('DOMContentLoaded', () => {
         videoTitle.textContent = video.title || '';
         channelName.textContent = video.author || 'Không rõ kênh';
 
-        const viewsText = video.views ? `${formatViews(video.views)} lượt xem` : '';
-        videoStats.textContent = [viewsText, video.ago].filter(Boolean).join(' · ');
+        channelSubs.textContent = getDeterministicSubCount(video.author);
+
+        const viewsText = video.views ? `${formatFullNumber(video.views)} lượt xem` : '';
+        descriptionStats.textContent = [viewsText, video.ago].filter(Boolean).join(' · ');
+        descriptionText.textContent = cleanDescription(video.desc) || 'Không có mô tả.';
+        descriptionBox.classList.add('collapsed');
+        descriptionToggleText.textContent = 'Thêm';
 
         const color = getAvatarColor(video.author);
         channelAvatar.style.background = color;

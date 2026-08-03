@@ -917,10 +917,54 @@ img { display: block; }
     color: var(--accent);
 }
 
-.video-stats {
-    font-size: 12px;
+.channel-subs {
+    font-size: 11.5px;
     color: var(--textSub);
     margin-top: 2px;
+}
+
+/* Description Box */
+.description-box {
+    background: var(--accentSoft);
+    border-radius: var(--radius-card);
+    padding: 14px;
+    margin-top: 16px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text);
+    cursor: pointer;
+    transition: background var(--transition);
+    overflow: hidden;
+}
+
+.description-box:hover {
+    background: var(--surfaceHover);
+}
+
+.description-stats {
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 6px;
+}
+
+.description-text {
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--text);
+}
+
+.description-box.collapsed .description-text {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.description-toggle-text {
+    font-weight: 700;
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--text);
 }
 
 .meta-right {
