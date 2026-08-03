@@ -13,7 +13,10 @@ exports.handler = async function (event, context) {
       };
     }
 
-    const results = await yts(query);
+    const hl = (event.queryStringParameters && event.queryStringParameters.hl) || 'en';
+    const gl = (event.queryStringParameters && event.queryStringParameters.gl) || 'US';
+
+    const results = await yts({ query, hl, gl });
     const liveVideos = (results.live || [])
       .filter(v => v.status === 'LIVE')
       .map(v => ({

@@ -1,8 +1,62 @@
 diff --git a/node_modules/yt-search/dist/yt-search.js b/node_modules/yt-search/dist/yt-search.js
-index 3e65db0..2d28224 100644
+index 3e65db0..1c75ceb 100644
 --- a/node_modules/yt-search/dist/yt-search.js
 +++ b/node_modules/yt-search/dist/yt-search.js
-@@ -611,7 +611,7 @@ function _parseSearchResultInitialData(responseText, callback) {
+@@ -278,11 +278,25 @@ function getSearchResults(_options, callback) {
+   }
+   var uri = TEMPLATES.SEARCH_DESKTOP + queryString;
+   var params = _url.parse(uri);
++  var REGION_IPS = {
++    US: '8.8.8.8',
++    JP: '133.242.0.1',
++    KR: '110.45.0.1',
++    GB: '151.236.0.1',
++    DE: '138.201.0.1',
++    FR: '51.15.0.1',
++    TH: '171.96.0.1',
++    VN: '118.69.0.1'
++  };
++  var clientIp = REGION_IPS[gl] || '8.8.8.8';
++
+   params.headers = {
+     'user-agent': _userAgent,
+     'accept': 'text/html',
+     'accept-encoding': 'gzip',
+-    'accept-language': 'en-US'
++    'accept-language': (hl ? hl + '-' + gl + ',' + hl + ';q=0.9,' : '') + 'en-US;q=0.8',
++    'x-forwarded-for': clientIp,
++    'client-ip': clientIp
+   };
+   debug(params);
+   debug('getting results: ' + _options.currentPage);
+@@ -465,7 +479,7 @@ function _parseSearchResultInitialData(responseText, callback) {
+               type: 'video',
+               videoId: videoId,
+               url: url,
+-              title: title.trim(),
++              title: (typeof title === 'string' ? title : String(title || '')).trim(),
+               description: description,
+               image: thumbnail,
+               thumbnail: thumbnail,
+@@ -530,7 +544,7 @@ function _parseSearchResultInitialData(responseText, callback) {
+               type: 'list',
+               listId: listId,
+               url: _url2,
+-              title: _title.trim(),
++              title: (typeof _title === 'string' ? _title : String(_title || '')).trim(),
+               image: _thumbnail,
+               thumbnail: _thumbnail,
+               videoCount: Number(_parseNumbers(video_count_label)[0]) || video_count,
+@@ -579,7 +593,7 @@ function _parseSearchResultInitialData(responseText, callback) {
+               url: TEMPLATES.YT + base_url,
+               baseUrl: base_url,
+               id: _channelId,
+-              title: _title2.trim(),
++              title: (typeof _title2 === 'string' ? _title2 : String(_title2 || '')).trim(),
+               about: about_channel,
+               image: _thumbnail2,
+               thumbnail: _thumbnail2,
+@@ -611,7 +625,7 @@ function _parseSearchResultInitialData(responseText, callback) {
                type: 'live',
                videoId: videoId,
                url: _url3,

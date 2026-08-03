@@ -72,6 +72,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const hamburger = document.getElementById('hamburger');
     const searchInput = document.getElementById('searchInput');
     const searchClear = document.getElementById('searchClear');
+    const searchGl = document.getElementById('searchGl');
+    const searchHl = document.getElementById('searchHl');
     const themeToggle = document.getElementById('themeToggle');
     const themeLabel = document.getElementById('themeLabel');
     const fileWarning = document.getElementById('fileWarning');
@@ -114,6 +116,94 @@ document.addEventListener('DOMContentLoaded', () => {
     const historyRows = document.getElementById('historyRows');
     const historyEmpty = document.getElementById('historyEmpty');
     const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+
+    // ── Custom Dropdown Handler ──
+    function setupCustomDropdown(dropdownId, selectId, labelId) {
+        const container = document.getElementById(dropdownId);
+        const select = document.getElementById(selectId);
+        const label = document.getElementById(labelId);
+        if (!container || !select) return;
+
+        const btn = container.querySelector('.custom-dropdown-btn');
+        const items = container.querySelectorAll('.custom-dropdown-item');
+
+        function syncUI(val) {
+            items.forEach(item => {
+                const isActive = item.dataset.value === val;
+                item.classList.toggle('active', isActive);
+                if (isActive && label) {
+                    label.textContent = item.dataset.label || item.textContent.trim();
+                }
+            });
+        }
+
+        if (btn) {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isOpen = container.classList.contains('open');
+                document.querySelectorAll('.custom-dropdown.open').forEach(d => d.classList.remove('open'));
+                if (!isOpen) {
+                    container.classList.add('open');
+                    btn.setAttribute('aria-expanded', 'true');
+                }
+            });
+        }
+
+        items.forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const val = item.dataset.value;
+                select.value = val;
+                syncUI(val);
+                container.classList.remove('open');
+                if (btn) btn.setAttribute('aria-expanded', 'false');
+                select.dispatchEvent(new Event('change'));
+            });
+        });
+
+        syncUI(select.value);
+    }
+
+    document.addEventListener('click', () => {
+        document.querySelectorAll('.custom-dropdown.open').forEach(d => {
+            d.classList.remove('open');
+            const btn = d.querySelector('.custom-dropdown-btn');
+            if (btn) btn.setAttribute('aria-expanded', 'false');
+        });
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.custom-dropdown.open').forEach(d => {
+                d.classList.remove('open');
+                const btn = d.querySelector('.custom-dropdown-btn');
+                if (btn) btn.setAttribute('aria-expanded', 'false');
+            });
+        }
+    });
+
+    // ── Init Search Preferences ──
+    let searchGlVal = localStorage.getItem('yt_search_gl') || 'US';
+    let searchHlVal = localStorage.getItem('yt_search_hl') || 'en';
+    if (searchGl) searchGl.value = searchGlVal;
+    if (searchHl) searchHl.value = searchHlVal;
+
+    setupCustomDropdown('glDropdown', 'searchGl', 'glLabel');
+    setupCustomDropdown('hlDropdown', 'searchHl', 'hlLabel');
+
+    if (searchGl) {
+        searchGl.addEventListener('change', () => {
+            localStorage.setItem('yt_search_gl', searchGl.value);
+            if (query) doSearch(query);
+        });
+    }
+
+    if (searchHl) {
+        searchHl.addEventListener('change', () => {
+            localStorage.setItem('yt_search_hl', searchHl.value);
+            if (query) doSearch(query);
+        });
+    }
 
     // ── Init ──
     applyTheme();
@@ -297,7 +387,9 @@ document.addEventListener('DOMContentLoaded', () => {
         hideError();
 
         try {
-            const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(q)}`);
+            const gl = searchGl ? searchGl.value : 'VN';
+            const hl = searchHl ? searchHl.value : 'vi';
+            const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(q)}&hl=${encodeURIComponent(hl)}&gl=${encodeURIComponent(gl)}`);
             const data = await res.json();
             gridLoader.style.display = 'none';
             isSearching = false;
@@ -495,8 +587,10 @@ document.addEventListener('DOMContentLoaded', () => {
         suggestedList.innerHTML = '<div class="suggested-loader"><div class="spinner small"></div></div>';
         currentSuggested = [];
         try {
+            const gl = searchGl ? searchGl.value : 'VN';
+            const hl = searchHl ? searchHl.value : 'vi';
             const q = encodeURIComponent(video.author || video.title || 'music');
-            const res = await fetch(`${API_BASE}/api/search?q=${q}`);
+            const res = await fetch(`${API_BASE}/api/search?q=${q}&hl=${encodeURIComponent(hl)}&gl=${encodeURIComponent(gl)}`);
             const data = await res.json();
 
             suggestedList.innerHTML = '';

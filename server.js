@@ -26,7 +26,10 @@ app.get('/api/search', async (req, res) => {
       return res.status(400).json({ error: 'Missing query parameter' });
     }
 
-    const results = await yts(query);
+    const hl = req.query.hl || 'en';
+    const gl = req.query.gl || 'US';
+
+    const results = await yts({ query, hl, gl });
     const liveVideos = (results.live || [])
       .filter(v => v.status === 'LIVE')
       .map(v => ({
