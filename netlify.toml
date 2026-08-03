@@ -16,3 +16,13 @@
   from = "/api/thumbnail"
   to = "/.netlify/functions/thumbnail"
   status = 200
+
+[[redirects]]
+  from = "/api/channel"
+  to = "/.netlify/functions/channel"
+  status = 200
+
+[[redirects]]
+  from = "/api/proxy-image"
+  to = "/.netlify/functions/proxy-image"
+  status = 200

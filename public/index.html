@@ -139,6 +139,36 @@
                 </div>
             </section>
 
+            <!-- ── View: Channel ── -->
+            <section class="view" id="view-channel" style="display:none">
+                <div class="content-area">
+                    <button class="back-btn" id="channelBackBtn">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                        Quay lại
+                    </button>
+                    
+                    <div class="channel-header-card" id="channelHeaderCard">
+                        <div class="channel-banner-wrap" id="channelBannerWrap">
+                            <img class="channel-banner" id="channelBanner" src="" alt="Banner">
+                        </div>
+                        <div class="channel-profile-row">
+                            <div class="channel-profile-avatar" id="channelProfileAvatar"></div>
+                            <div class="channel-profile-info">
+                                <h1 class="channel-profile-title" id="channelProfileTitle"></h1>
+                                <div class="channel-profile-subs" id="channelProfileSubs"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <h3 class="channel-videos-heading" style="margin-top: 24px; margin-bottom: 16px; font-size: 16px; font-weight: 700;">Video đã tải lên</h3>
+                    <div class="video-grid" id="channelGrid"></div>
+                    <div class="grid-loader" id="channelLoader" style="display:none">
+                        <div class="spinner"></div>
+                        <span>Đang tải danh sách video...</span>
+                    </div>
+                </div>
+            </section>
+
             <!-- ── View: Saved ── -->
             <section class="view" id="view-saved" style="display:none">
                 <div class="content-area">

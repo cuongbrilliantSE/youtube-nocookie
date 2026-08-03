@@ -153,6 +153,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const suggestedList = document.getElementById('suggestedList');
     const backBtn = document.getElementById('backBtn');
 
+    // Channel view
+    const channelBackBtn = document.getElementById('channelBackBtn');
+    const channelBannerWrap = document.getElementById('channelBannerWrap');
+    const channelBanner = document.getElementById('channelBanner');
+    const channelProfileAvatar = document.getElementById('channelProfileAvatar');
+    const channelProfileTitle = document.getElementById('channelProfileTitle');
+    const channelProfileSubs = document.getElementById('channelProfileSubs');
+    const channelGrid = document.getElementById('channelGrid');
+    const channelLoader = document.getElementById('channelLoader');
+
     // Saved view
     const savedGrid = document.getElementById('savedGrid');
     const savedEmpty = document.getElementById('savedEmpty');
@@ -236,6 +246,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Restore previous state if present (e.g. on page reload)
     const savedVideoStr = sessionStorage.getItem('yt_nocookie_video');
     const savedView = sessionStorage.getItem('yt_nocookie_view');
+    const savedChannelId = sessionStorage.getItem('yt_nocookie_channel_id');
+    const savedChannelName = sessionStorage.getItem('yt_nocookie_channel_name');
     if (savedView === 'watch' && savedVideoStr) {
         try {
             const savedVideo = JSON.parse(savedVideoStr);
@@ -243,6 +255,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) {
             showHomeDefault();
         }
+    } else if (savedView === 'channel' && savedChannelId) {
+        openChannel(savedChannelId, savedChannelName || 'Kênh');
     } else if (savedView && savedView !== 'watch') {
         switchView(savedView);
     } else {
@@ -256,7 +270,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     channelName.addEventListener('click', () => {
         if (currentVideo && currentVideo.author) {
-            searchChannel(currentVideo.author, currentVideo.authorUrl);
+            openChannel(currentVideo.authorUrl, currentVideo.author);
+        }
+    });
+
+    channelAvatar.addEventListener('click', () => {
+        if (currentVideo && currentVideo.author) {
+            openChannel(currentVideo.authorUrl, currentVideo.author);
+        }
+    });
+
+    channelBackBtn.addEventListener('click', () => {
+        const prevVideoStr = sessionStorage.getItem('yt_nocookie_video');
+        const prevView = sessionStorage.getItem('yt_nocookie_prev_view') || 'home';
+        if (prevView === 'watch' && prevVideoStr) {
+            try {
+                openWatch(JSON.parse(prevVideoStr));
+            } catch (e) {
+                switchView('home');
+            }
+        } else {
+            switchView(prevView === 'watch' ? 'home' : prevView);
         }
     });
 
@@ -304,6 +338,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function switchView(v) {
         const leavingWatch = view === 'watch' && v !== 'watch';
+        if (v === 'channel') {
+            sessionStorage.setItem('yt_nocookie_prev_view', view);
+        }
 
         view = v;
         sessionStorage.setItem('yt_nocookie_view', v);
@@ -412,6 +449,81 @@ document.addEventListener('DOMContentLoaded', () => {
         toggleSearchClear();
         switchView('home');
         doSearch(q);
+    }
+
+    function openChannel(authorUrl, authorName) {
+        if (!authorUrl) {
+            searchChannel(authorName);
+            return;
+        }
+
+        let identifier = authorUrl.replace('https://youtube.com', '').replace('https://www.youtube.com', '').trim();
+        if (identifier.startsWith('/')) identifier = identifier.slice(1);
+
+        if (!identifier) {
+            searchChannel(authorName);
+            return;
+        }
+
+        switchView('channel');
+        loadChannelData(identifier, authorName);
+    }
+
+    async function loadChannelData(identifier, authorName) {
+        channelGrid.innerHTML = '';
+        channelLoader.style.display = 'flex';
+        channelBannerWrap.style.display = 'none';
+        channelProfileAvatar.style.backgroundColor = getAvatarColor(authorName || 'Kênh');
+        channelProfileAvatar.style.backgroundImage = 'none';
+        channelProfileAvatar.textContent = getInitials(authorName || 'Kênh');
+        channelProfileTitle.textContent = authorName || 'Đang tải...';
+        channelProfileSubs.textContent = '';
+
+        try {
+            const res = await fetch(`${API_BASE}/api/channel?id=${encodeURIComponent(identifier)}`);
+            const data = await res.json();
+            channelLoader.style.display = 'none';
+
+            if (!data.success || !data.channel) {
+                showError('Không thể tải thông tin kênh.');
+                return;
+            }
+
+            const chan = data.channel;
+            sessionStorage.setItem('yt_nocookie_channel_id', chan.id);
+            sessionStorage.setItem('yt_nocookie_channel_name', chan.title);
+
+            channelProfileTitle.textContent = chan.title || authorName || 'Kênh';
+            if (chan.subscribers) {
+                channelProfileSubs.textContent = chan.subscribers;
+            } else {
+                channelProfileSubs.textContent = getDeterministicSubCount(chan.title);
+            }
+
+            if (chan.avatar) {
+                channelProfileAvatar.textContent = '';
+                channelProfileAvatar.style.backgroundImage = `url("${chan.avatar}")`;
+            }
+
+            if (chan.banner) {
+                channelBanner.src = chan.banner;
+                channelBannerWrap.style.display = 'block';
+            } else {
+                channelBannerWrap.style.display = 'none';
+            }
+
+            if (data.videos && data.videos.length > 0) {
+                data.videos.forEach(video => {
+                    channelGrid.appendChild(createVideoCard(video));
+                });
+            } else {
+                channelGrid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: var(--textFaint); padding: 40px 0;">Kênh này chưa có video nào.</p>';
+            }
+        } catch (e) {
+            console.error('loadChannelData error:', e);
+            channelLoader.style.display = 'none';
+            showError('Đã xảy ra lỗi khi tải dữ liệu kênh.');
+        }
     }
 
     // ── Search API ──
@@ -526,7 +638,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (channelBtn && video.author) {
             channelBtn.addEventListener('click', e => {
                 e.stopPropagation();
-                searchChannel(video.author, video.authorUrl);
+                openChannel(video.authorUrl, video.author);
+            });
+        }
+
+        const avatarBtn = card.querySelector('.card-avatar');
+        if (avatarBtn && video.author) {
+            avatarBtn.style.cursor = 'pointer';
+            avatarBtn.addEventListener('click', e => {
+                e.stopPropagation();
+                openChannel(video.authorUrl, video.author);
             });
         }
 
@@ -554,8 +675,31 @@ document.addEventListener('DOMContentLoaded', () => {
         descriptionToggleText.textContent = 'Thêm';
 
         const color = getAvatarColor(video.author);
-        channelAvatar.style.background = color;
+        channelAvatar.style.backgroundColor = color;
+        channelAvatar.style.backgroundImage = 'none';
         channelAvatar.textContent = getInitials(video.author);
+
+        // Load actual channel details in background
+        if (video.authorUrl) {
+            let identifier = video.authorUrl.replace('https://youtube.com', '').replace('https://www.youtube.com', '').trim();
+            if (identifier.startsWith('/')) identifier = identifier.slice(1);
+            if (identifier) {
+                fetch(`${API_BASE}/api/channel?id=${encodeURIComponent(identifier)}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success && data.channel) {
+                            if (data.channel.avatar) {
+                                channelAvatar.textContent = '';
+                                channelAvatar.style.backgroundImage = `url("${data.channel.avatar}")`;
+                            }
+                            if (data.channel.subscribers) {
+                                channelSubs.textContent = data.channel.subscribers;
+                            }
+                        }
+                    })
+                    .catch(err => console.error('Error fetching watch page channel details:', err));
+            }
+        }
 
         updateSaveBtnState();
         addToHistory(video);
@@ -675,7 +819,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (channelBtn && video.author) {
             channelBtn.addEventListener('click', e => {
                 e.stopPropagation();
-                searchChannel(video.author, video.authorUrl);
+                openChannel(video.authorUrl, video.author);
             });
         }
 
