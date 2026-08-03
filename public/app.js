@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     // ── State ──
-    let theme = localStorage.getItem('hush_theme') || 'dark';
+    let theme = 'dark';
     let view = 'home';
     let query = '';
     let currentVideo = null;
@@ -117,10 +117,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const hamburger = document.getElementById('hamburger');
     const searchInput = document.getElementById('searchInput');
     const searchClear = document.getElementById('searchClear');
-    const searchGl = document.getElementById('searchGl');
-    const searchHl = document.getElementById('searchHl');
-    const themeToggle = document.getElementById('themeToggle');
-    const themeLabel = document.getElementById('themeLabel');
     const fileWarning = document.getElementById('fileWarning');
     const errorMsg = document.getElementById('errorMsg');
     const errorText = document.getElementById('errorText');
@@ -231,28 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // ── Init Search Preferences ──
-    let searchGlVal = localStorage.getItem('yt_search_gl') || 'US';
-    let searchHlVal = localStorage.getItem('yt_search_hl') || 'en';
-    if (searchGl) searchGl.value = searchGlVal;
-    if (searchHl) searchHl.value = searchHlVal;
 
-    setupCustomDropdown('glDropdown', 'searchGl', 'glLabel');
-    setupCustomDropdown('hlDropdown', 'searchHl', 'hlLabel');
-
-    if (searchGl) {
-        searchGl.addEventListener('change', () => {
-            localStorage.setItem('yt_search_gl', searchGl.value);
-            if (query) doSearch(query);
-        });
-    }
-
-    if (searchHl) {
-        searchHl.addEventListener('change', () => {
-            localStorage.setItem('yt_search_hl', searchHl.value);
-            if (query) doSearch(query);
-        });
-    }
 
     // ── Init ──
     applyTheme();
@@ -276,16 +251,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ── Theme ──
     function applyTheme() {
-        htmlEl.setAttribute('data-theme', theme);
-        themeLabel.textContent = theme === 'dark' ? 'Tối' : 'Sáng';
-        themeToggle.setAttribute('aria-checked', String(theme === 'dark'));
+        htmlEl.setAttribute('data-theme', 'dark');
     }
-
-    themeToggle.addEventListener('click', () => {
-        theme = theme === 'dark' ? 'light' : 'dark';
-        localStorage.setItem('hush_theme', theme);
-        applyTheme();
-    });
 
     channelName.addEventListener('click', () => {
         if (currentVideo && currentVideo.author) {
@@ -457,8 +424,8 @@ document.addEventListener('DOMContentLoaded', () => {
         hideError();
 
         try {
-            const gl = searchGl ? searchGl.value : 'VN';
-            const hl = searchHl ? searchHl.value : 'vi';
+            const gl = 'VN';
+            const hl = 'vi';
             const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(q)}&hl=${encodeURIComponent(hl)}&gl=${encodeURIComponent(gl)}`);
             const data = await res.json();
             gridLoader.style.display = 'none';
@@ -663,8 +630,8 @@ document.addEventListener('DOMContentLoaded', () => {
         suggestedList.innerHTML = '<div class="suggested-loader"><div class="spinner small"></div></div>';
         currentSuggested = [];
         try {
-            const gl = searchGl ? searchGl.value : 'VN';
-            const hl = searchHl ? searchHl.value : 'vi';
+            const gl = 'VN';
+            const hl = 'vi';
             const q = encodeURIComponent(video.author || video.title || 'music');
             const res = await fetch(`${API_BASE}/api/search?q=${q}&hl=${encodeURIComponent(hl)}&gl=${encodeURIComponent(gl)}`);
             const data = await res.json();
