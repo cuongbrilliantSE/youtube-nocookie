@@ -27,6 +27,9 @@ document.addEventListener('DOMContentLoaded', () => {
         pathCopiedFlag: false,
         relatedCache: {},   // videoId -> related video array
         isPlaying: false,
+        currentTime: 0,
+        duration: 0,
+        isDraggingSeekbar: false,
     };
 
     const videoLookup = {};
@@ -154,12 +157,30 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function seekTo(id, seconds) {
+        const pane = playerPanes[id];
+        if (!pane) return;
+        const iframe = pane.querySelector('iframe');
+        if (iframe && iframe.contentWindow) {
+            iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'seekTo', args: [seconds, true] }), '*');
+        }
+    }
+
+    function formatTime(secs) {
+        if (isNaN(secs) || secs === undefined) return '00:00';
+        const m = Math.floor(secs / 60);
+        const s = Math.floor(secs % 60);
+        return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
     // ── Actions ──
     function openFile(video) {
         if (!video || !video.id) return;
         if (!D.openTabs.some(t => t.id === video.id)) D.openTabs.push(video);
         D.activeTabId = video.id;
         D.tickSeconds = 0;
+        D.currentTime = 0;
+        D.duration = 0;
         D.sidebarMobileOpen = false;
         D.pathCopiedFlag = false;
         registerVideos([video]);
@@ -188,6 +209,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         D.activeTabId = video.id;
         D.tickSeconds = 0;
+        D.currentTime = 0;
+        D.duration = 0;
         D.pathCopiedFlag = false;
 
         // Clean up old player pane if it exists so playback stops
@@ -414,6 +437,14 @@ document.addEventListener('DOMContentLoaded', () => {
             <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5,4 15,12 5,20"/><rect x="17" y="4" width="2" height="16"/></svg>
         </div>`;
 
+        const timeDisplay = `<span class="vc-time-display vc-mono" style="font-size:11.5px;color:var(--vcTextMuted);margin-left:4px;user-select:none;display:inline-block;min-width:76px;">
+            ${formatTime(D.currentTime)} / ${formatTime(D.duration)}
+        </span>`;
+
+        const seekbar = `<input type="range" class="vc-seekbar" min="0" max="${D.duration || 0}" value="${D.currentTime || 0}" 
+            style="width:90px;height:4px;cursor:pointer;accent-color:var(--vc-accent);background:var(--vcBorder);border-radius:2px;outline:none;margin-left:2px;" 
+            title="Tua nội dung">`;
+
         host.innerHTML = `
             <div class="vc-breadcrumb">
                 <span class="vc-mono">${escHtml(PROJECT_NAME)} &gt; src &gt; results &gt; ${escHtml(fileNameOf(v))}</span>
@@ -422,6 +453,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     ${playPauseBtn}
                     ${stopBtn}
                     ${nextBtn}
+                    ${timeDisplay}
+                    ${seekbar}
                     <div style="width:1px;height:12px;background:var(--vcBorder);margin:0 4px;"></div>
                     <div class="vc-icon-btn" title="Add to saved" data-vc-toggle-saved="${escHtml(v.id)}" style="color:${isSaved ? 'var(--vc-accent)' : 'var(--vcTextMuted)'}">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="${isSaved ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.6"><polygon points="12,3 15,9.5 22,10.3 17,15 18.3,22 12,18.5 5.7,22 7,15 2,10.3 9,9.5"/></svg>
@@ -731,6 +764,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
         root.addEventListener('input', (e) => {
             if (e.target.classList.contains('vc-search-input')) onSearchInputChange(e);
+
+            if (e.target.classList.contains('vc-seekbar')) {
+                D.isDraggingSeekbar = true;
+                const timeText = root.querySelector('.vc-time-display');
+                if (timeText) {
+                    timeText.textContent = `${formatTime(e.target.value)} / ${formatTime(D.duration)}`;
+                }
+            }
+        });
+
+        root.addEventListener('change', (e) => {
+            if (e.target.classList.contains('vc-seekbar')) {
+                const targetTime = parseFloat(e.target.value);
+                seekTo(D.activeTabId, targetTime);
+                D.currentTime = targetTime;
+                D.isDraggingSeekbar = false;
+            }
         });
 
         window.addEventListener('resize', () => { if (D.active) renderSidebar(); });
@@ -741,18 +791,36 @@ document.addEventListener('DOMContentLoaded', () => {
             let data;
             try { data = JSON.parse(e.data); } catch (err) { return; }
 
-            // Sync play/pause state from iframe player status
+            // Sync play/pause state and current time from iframe player status
             if (data.event === 'infoDelivery' && data.info) {
+                let changed = false;
+
                 if (data.info.playerState === 1) {
                     if (!D.isPlaying) {
                         D.isPlaying = true;
-                        renderBreadcrumb();
+                        changed = true;
                     }
                 } else if (data.info.playerState === 2 || data.info.playerState === 0 || data.info.playerState === -1) {
                     if (D.isPlaying) {
                         D.isPlaying = false;
-                        renderBreadcrumb();
+                        changed = true;
                     }
+                }
+
+                if (data.info.duration !== undefined && data.info.duration !== D.duration) {
+                    D.duration = data.info.duration;
+                    changed = true;
+                }
+
+                if (data.info.currentTime !== undefined && !D.isDraggingSeekbar) {
+                    if (Math.abs(data.info.currentTime - D.currentTime) > 0.5) {
+                        D.currentTime = data.info.currentTime;
+                        changed = true;
+                    }
+                }
+
+                if (changed) {
+                    renderBreadcrumb();
                 }
             }
 
