@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
         bottomPanelTab: 'output',
         pathCopiedFlag: false,
         relatedCache: {},   // videoId -> related video array
+        isPlaying: false,
     };
 
     const videoLookup = {};
@@ -135,6 +136,24 @@ document.addEventListener('DOMContentLoaded', () => {
         return list;
     }
 
+    function playVideo(id) {
+        const pane = playerPanes[id];
+        if (!pane) return;
+        const iframe = pane.querySelector('iframe');
+        if (iframe && iframe.contentWindow) {
+            iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'playVideo' }), '*');
+        }
+    }
+
+    function pauseVideo(id) {
+        const pane = playerPanes[id];
+        if (!pane) return;
+        const iframe = pane.querySelector('iframe');
+        if (iframe && iframe.contentWindow) {
+            iframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo' }), '*');
+        }
+    }
+
     // ── Actions ──
     function openFile(video) {
         if (!video || !video.id) return;
@@ -146,6 +165,41 @@ document.addEventListener('DOMContentLoaded', () => {
         registerVideos([video]);
         addToHistory(video);
         render();
+        fetchRelated(video).then(() => {
+            if (D.activeTabId === video.id) renderBottomPanel();
+        });
+    }
+
+    function replaceActiveTabWith(video) {
+        if (!video || !video.id) return;
+
+        const oldId = D.activeTabId;
+        if (!oldId) {
+            openFile(video);
+            return;
+        }
+
+        const idx = D.openTabs.findIndex(t => t.id === oldId);
+        if (idx !== -1) {
+            D.openTabs[idx] = video;
+        } else {
+            D.openTabs.push(video);
+        }
+
+        D.activeTabId = video.id;
+        D.tickSeconds = 0;
+        D.pathCopiedFlag = false;
+
+        // Clean up old player pane if it exists so playback stops
+        if (oldId && playerPanes[oldId] && oldId !== video.id) {
+            playerPanes[oldId].remove();
+            delete playerPanes[oldId];
+        }
+
+        registerVideos([video]);
+        addToHistory(video);
+        render();
+
         fetchRelated(video).then(() => {
             if (D.activeTabId === video.id) renderBottomPanel();
         });
@@ -335,10 +389,40 @@ document.addEventListener('DOMContentLoaded', () => {
         const v = D.openTabs.find(t => t.id === D.activeTabId);
         if (!v) { host.innerHTML = ''; return; }
         const isSaved = D.saved.some(s => s.id === v.id);
+
+        const hasPrev = D.history && D.history.length > 1;
+        const related = D.relatedCache[v.id] || [];
+        const hasNext = related.length > 0;
+
+        const backBtn = `<div class="vc-icon-btn" title="Video trước đó (Back)" data-vc-back="${escHtml(v.id)}" style="color:${hasPrev ? 'var(--vcText)' : 'rgba(255,255,255,0.15)'};cursor:${hasPrev ? 'pointer' : 'default'}">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="19,20 9,12 19,4"/><rect x="5" y="4" width="2" height="16"/></svg>
+        </div>`;
+
+        const playPauseBtn = D.isPlaying
+            ? `<div class="vc-icon-btn" title="Tạm dừng âm thanh (Pause)" data-vc-pause="${escHtml(v.id)}" style="color:#f14c4c">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="5" y="4" width="4" height="16"/><rect x="15" y="4" width="4" height="16"/></svg>
+               </div>`
+            : `<div class="vc-icon-btn" title="Phát âm thanh (Play)" data-vc-play="${escHtml(v.id)}" style="color:#89d185">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6,3 20,12 6,21"/></svg>
+               </div>`;
+
+        const stopBtn = `<div class="vc-icon-btn" title="Dừng phát âm thanh (Stop)" data-vc-stop="${escHtml(v.id)}" style="color:var(--vcTextMuted)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="4" y="4" width="16" height="16"/></svg>
+        </div>`;
+
+        const nextBtn = `<div class="vc-icon-btn" title="Video tiếp theo (Next)" data-vc-next="${escHtml(v.id)}" style="color:${hasNext ? 'var(--vcText)' : 'rgba(255,255,255,0.15)'};cursor:${hasNext ? 'pointer' : 'default'}">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5,4 15,12 5,20"/><rect x="17" y="4" width="2" height="16"/></svg>
+        </div>`;
+
         host.innerHTML = `
             <div class="vc-breadcrumb">
                 <span class="vc-mono">${escHtml(PROJECT_NAME)} &gt; src &gt; results &gt; ${escHtml(fileNameOf(v))}</span>
-                <div class="vc-breadcrumb-actions">
+                <div class="vc-breadcrumb-actions" style="display:flex;gap:6px;align-items:center;">
+                    ${backBtn}
+                    ${playPauseBtn}
+                    ${stopBtn}
+                    ${nextBtn}
+                    <div style="width:1px;height:12px;background:var(--vcBorder);margin:0 4px;"></div>
                     <div class="vc-icon-btn" title="Add to saved" data-vc-toggle-saved="${escHtml(v.id)}" style="color:${isSaved ? 'var(--vc-accent)' : 'var(--vcTextMuted)'}">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="${isSaved ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.6"><polygon points="12,3 15,9.5 22,10.3 17,15 18.3,22 12,18.5 5.7,22 7,15 2,10.3 9,9.5"/></svg>
                     </div>
@@ -369,6 +453,17 @@ document.addEventListener('DOMContentLoaded', () => {
             pane.className = 'vc-player-pane';
             pane.style.cssText = 'flex:1;min-height:0;display:flex;flex-direction:column';
             const embedUrl = `https://www.youtube-nocookie.com/embed/${v.id}?rel=0&modestbranding=1&playsinline=1&autoplay=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}`;
+            
+            const ext = extOf(v.id);
+            let defaultCode = '';
+            if (ext === '.py') {
+                defaultCode = `# File: ${fileNameOf(v)}\n# Title: ${v.title || ''}\n\ndef main():\n    print("Playing: ${v.title || ''}")\n    # Ghi chú của bạn ở đây:\n    \n\nif __name__ == "__main__":\n    main()\n`;
+            } else if (ext === '.go') {
+                defaultCode = `package main\n\nimport "fmt"\n\n// File: ${fileNameOf(v)}\nfunc main() {\n\tfmt.Println("Playing: ${v.title || ''}")\n\t// Ghi chú của bạn ở đây:\n\t\n}\n`;
+            } else {
+                defaultCode = `// File: ${fileNameOf(v)}\n// Title: ${v.title || ''}\n\nconst playerInfo = {\n  id: "${v.id}",\n  title: "${v.title || ''}"\n};\n\nfunction init() {\n  console.log("Playing:", playerInfo.title);\n  // Ghi chú của bạn ở đây:\n  \n}\n\ninit();\n`;
+            }
+
             pane.innerHTML = `
                 <div class="vc-browser-toolbar">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--vcTextMuted)"><path d="M15 5l-7 7 7 7"/></svg>
@@ -376,10 +471,30 @@ document.addEventListener('DOMContentLoaded', () => {
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--vcTextMuted)"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/></svg>
                     <div class="vc-addressbar vc-mono"><span class="vc-live-dot"></span>localhost:5173/preview/${escHtml(v.id)}</div>
                 </div>
-                <div class="vc-player-frame">
-                    <iframe src="${embedUrl}" title="${escHtml(v.title || '')}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+                <div class="vc-editor-body" style="flex:1;min-height:0;display:flex;position:relative;background:var(--vcEditorBg);">
+                    <div class="vc-line-numbers vc-mono" style="padding:10px 8px;text-align:right;color:var(--vcLineNum);user-select:none;border-right:1px solid var(--vcBorder);background:var(--vcEditorBg);min-width:40px;font-size:12px;line-height:1.5;overflow:hidden;">
+                        1
+                    </div>
+                    <textarea class="vc-code-textarea vc-mono" spellcheck="false" style="flex:1;border:none;outline:none;background:var(--vcEditorBg);color:var(--vcText);padding:10px;resize:none;font-size:12px;line-height:1.5;font-family:\'JetBrains Mono\',monospace;height:100%;"></textarea>
+                    <iframe src="${embedUrl}" title="${escHtml(v.title || '')}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" style="width:1px;height:1px;position:absolute;bottom:0;right:0;opacity:0;pointer-events:none;border:none;"></iframe>
                 </div>`;
             host.appendChild(pane);
+            
+            const textarea = pane.querySelector('textarea');
+            textarea.value = defaultCode;
+            const lineNumbers = pane.querySelector('.vc-line-numbers');
+
+            const syncLineNumbers = () => {
+                const linesCount = textarea.value.split('\n').length;
+                lineNumbers.innerHTML = Array.from({length: Math.max(30, linesCount)}, (_, i) => i + 1).join('<br>');
+            };
+
+            textarea.addEventListener('input', syncLineNumbers);
+            textarea.addEventListener('scroll', () => {
+                lineNumbers.scrollTop = textarea.scrollTop;
+            });
+
+            syncLineNumbers();
             playerPanes[v.id] = pane;
 
             const iframe = pane.querySelector('iframe');
@@ -569,6 +684,48 @@ document.addEventListener('DOMContentLoaded', () => {
             if (e.target.closest('[data-vc-select-terminal]')) { D.bottomPanelTab = 'terminal'; D.bottomPanelOpen = true; renderBottomPanel(); return; }
             if (e.target.closest('[data-vc-toggle-bottom]')) { D.bottomPanelOpen = !D.bottomPanelOpen; renderBottomPanel(); return; }
 
+            const playEl = e.target.closest('[data-vc-play]');
+            if (playEl) {
+                playVideo(playEl.getAttribute('data-vc-play'));
+                D.isPlaying = true;
+                renderBreadcrumb();
+                return;
+            }
+
+            const pauseEl = e.target.closest('[data-vc-pause]');
+            if (pauseEl) {
+                pauseVideo(pauseEl.getAttribute('data-vc-pause'));
+                D.isPlaying = false;
+                renderBreadcrumb();
+                return;
+            }
+
+            const stopEl = e.target.closest('[data-vc-stop]');
+            if (stopEl) {
+                pauseVideo(stopEl.getAttribute('data-vc-stop'));
+                D.isPlaying = false;
+                renderBreadcrumb();
+                return;
+            }
+
+            const backEl = e.target.closest('[data-vc-back]');
+            if (backEl) {
+                if (D.history && D.history.length > 1) {
+                    replaceActiveTabWith(D.history[1]);
+                }
+                return;
+            }
+
+            const nextEl = e.target.closest('[data-vc-next]');
+            if (nextEl) {
+                const activeId = nextEl.getAttribute('data-vc-next');
+                const related = D.relatedCache[activeId] || [];
+                if (related.length > 0) {
+                    replaceActiveTabWith(related[0]);
+                }
+                return;
+            }
+
             if (e.target.closest('[data-vc-exit]')) { setDisguiseMode(false); return; }
         });
 
@@ -583,6 +740,22 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!D.active) return;
             let data;
             try { data = JSON.parse(e.data); } catch (err) { return; }
+
+            // Sync play/pause state from iframe player status
+            if (data.event === 'infoDelivery' && data.info) {
+                if (data.info.playerState === 1) {
+                    if (!D.isPlaying) {
+                        D.isPlaying = true;
+                        renderBreadcrumb();
+                    }
+                } else if (data.info.playerState === 2 || data.info.playerState === 0 || data.info.playerState === -1) {
+                    if (D.isPlaying) {
+                        D.isPlaying = false;
+                        renderBreadcrumb();
+                    }
+                }
+            }
+
             if (data.event !== 'infoDelivery' || !data.info || data.info.playerState !== 0) return;
             const endedId = Object.keys(playerPanes).find(id => {
                 const f = playerPanes[id].querySelector('iframe');
@@ -591,7 +764,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!endedId || endedId !== D.activeTabId || endedId === advancedForId) return;
             advancedForId = endedId;
             const related = D.relatedCache[endedId] || [];
-            if (related.length) openFile(related[0]);
+            if (related.length) replaceActiveTabWith(related[0]);
         });
     }
 
