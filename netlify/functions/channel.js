@@ -5,12 +5,123 @@ if (typeof dns.setDefaultResultOrder === 'function') {
 
 exports.handler = async function (event, context) {
   try {
+    const token = event.queryStringParameters.token;
+    if (token) {
+      const passedChannelId = event.queryStringParameters.id || '';
+      const passedChannelName = event.queryStringParameters.name || '';
+      const data = await getChannelContinuationData(token);
+      let items = [];
+      if (data.onResponseReceivedActions && data.onResponseReceivedActions[0] && data.onResponseReceivedActions[0].appendContinuationItemsAction) {
+        items = data.onResponseReceivedActions[0].appendContinuationItemsAction.continuationItems || [];
+      }
+      
+      const videos = [];
+      let nextToken = '';
+      
+      for (const item of items) {
+        if (item.continuationItemRenderer && item.continuationItemRenderer.continuationEndpoint && item.continuationItemRenderer.continuationEndpoint.continuationCommand) {
+          nextToken = item.continuationItemRenderer.continuationEndpoint.continuationCommand.token || '';
+          continue;
+        }
+        
+        const richContent = item.richItemRenderer && item.richItemRenderer.content;
+        const v = (richContent && richContent.videoRenderer) || item.videoRenderer;
+        const lockup = (richContent && richContent.lockupViewModel) || item.lockupViewModel;
+
+        if (v) {
+          const videoId = v.videoId;
+          const title = v.title && (v.title.simpleText || (v.title.runs && v.title.runs[0] && v.title.runs[0].text));
+          const thumbnail = `/api/thumbnail?id=${videoId}`;
+          const duration = v.lengthText && (v.lengthText.simpleText || (v.lengthText.runs && v.lengthText.runs[0] && v.lengthText.runs[0].text));
+          const viewsText = v.viewCountText && (v.viewCountText.simpleText || (v.viewCountText.runs && v.viewCountText.runs[0] && v.viewCountText.runs[0].text));
+          const ago = v.publishedTimeText && (v.publishedTimeText.simpleText || (v.publishedTimeText.runs && v.publishedTimeText.runs[0] && v.publishedTimeText.runs[0].text));
+          const desc = v.descriptionSnippet && v.descriptionSnippet.runs && v.descriptionSnippet.runs.map(r => r.text).join('');
+
+          videos.push({
+            id: videoId,
+            title: title || '',
+            thumbnail,
+            duration: duration || '',
+            author: passedChannelName || '',
+            authorUrl: passedChannelId ? `/channel/${passedChannelId}` : '',
+            views: parseInnerTubeViews(viewsText),
+            ago: ago || '',
+            desc: desc || ''
+          });
+        } else if (lockup) {
+          const videoId = lockup.contentId;
+          const metaVM = lockup.metadata && lockup.metadata.lockupMetadataViewModel;
+          const title = metaVM && metaVM.title && metaVM.title.content;
+          const thumbnail = `/api/thumbnail?id=${videoId}`;
+          
+          let duration = '';
+          const overlays = lockup.contentImage && lockup.contentImage.thumbnailViewModel && lockup.contentImage.thumbnailViewModel.overlays;
+          if (overlays) {
+            const bottomOverlay = overlays.find(o => o.thumbnailBottomOverlayViewModel);
+            if (bottomOverlay && bottomOverlay.thumbnailBottomOverlayViewModel.badges) {
+              const badge = bottomOverlay.thumbnailBottomOverlayViewModel.badges.find(b => b.thumbnailBadgeViewModel);
+              if (badge) {
+                duration = badge.thumbnailBadgeViewModel.text || '';
+              }
+            }
+          }
+
+          let viewsText = '';
+          let ago = '';
+          if (metaVM && metaVM.metadata && metaVM.metadata.contentMetadataViewModel && metaVM.metadata.contentMetadataViewModel.metadataRows) {
+            const rows = metaVM.metadata.contentMetadataViewModel.metadataRows;
+            if (rows[1] && rows[1].metadataParts) {
+              const parts = rows[1].metadataParts;
+              if (parts[0] && parts[0].text) viewsText = parts[0].text.content || '';
+              if (parts[1] && parts[1].text) ago = parts[1].text.content || '';
+            } else if (rows[0] && rows[0].metadataParts) {
+              rows[0].metadataParts.forEach(p => {
+                const text = p.text && p.text.content;
+                if (text) {
+                  if (text.includes('lượt xem') || text.includes('view') || text.includes('views')) {
+                    viewsText = text;
+                  } else if (text.trim().length > 0) {
+                    ago = text;
+                  }
+                }
+              });
+            }
+          }
+
+          videos.push({
+            id: videoId,
+            title: title || '',
+            thumbnail,
+            duration: duration || '',
+            author: passedChannelName || '',
+            authorUrl: passedChannelId ? `/channel/${passedChannelId}` : '',
+            views: parseInnerTubeViews(viewsText),
+            ago: ago || '',
+            desc: ''
+          });
+        }
+      }
+      
+      return {
+        statusCode: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+        body: JSON.stringify({
+          success: true,
+          videos,
+          continuationToken: nextToken
+        })
+      };
+    }
+
     const id = event.queryStringParameters.id;
     if (!id) {
       return {
         statusCode: 400,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: 'Missing channel id parameter' }),
+        body: JSON.stringify({ error: 'Missing channel id or token parameter' }),
       };
     }
 
@@ -183,6 +294,12 @@ exports.handler = async function (event, context) {
     const proxyAvatar = channelAvatar ? `/api/proxy-image?url=${encodeURIComponent(channelAvatar)}` : '';
     const proxyBanner = channelBanner ? `/api/proxy-image?url=${encodeURIComponent(channelBanner)}` : '';
 
+    let continuationToken = '';
+    const contItem = items.find(item => item.continuationItemRenderer);
+    if (contItem && contItem.continuationItemRenderer.continuationEndpoint && contItem.continuationItemRenderer.continuationEndpoint.continuationCommand) {
+      continuationToken = contItem.continuationItemRenderer.continuationEndpoint.continuationCommand.token || '';
+    }
+
     return {
       statusCode: 200,
       headers: {
@@ -198,7 +315,8 @@ exports.handler = async function (event, context) {
           banner: proxyBanner,
           subscribers: channelSubs
         },
-        videos
+        videos,
+        continuationToken
       }),
     };
   } catch (error) {
@@ -303,4 +421,40 @@ function parseInnerTubeViews(viewsText) {
     num *= 1000;
   }
   return Math.floor(num);
+}
+
+async function getChannelContinuationData(token) {
+  const url = 'https://www.youtube.com/youtubei/v1/browse?prettyPrint=false';
+  const body = {
+    context: {
+      client: {
+        hl: "vi",
+        gl: "VN",
+        clientName: "WEB",
+        clientVersion: "2.20260731.00.00",
+        osName: "Windows",
+        osVersion: "10.0",
+        platform: "DESKTOP"
+      }
+    },
+    continuation: token
+  };
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'accept': '*/*',
+      'accept-language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7',
+      'content-type': 'application/json',
+      'origin': 'https://www.youtube.com',
+      'referer': 'https://www.youtube.com/',
+      'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36',
+      'x-youtube-client-name': '1',
+      'x-youtube-client-version': '2.20260731.00.00'
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) throw new Error('Failed to fetch channel continuation from InnerTube');
+  return res.json();
 }

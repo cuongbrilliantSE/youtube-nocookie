@@ -18,45 +18,116 @@ const PORT = process.env.PORT || 3000;
 // Serve static files from the 'public' directory
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Search API endpoint
+// Search API endpoint — uses YouTube's internal search endpoint
 app.get('/api/search', async (req, res) => {
   try {
-    const query = req.query.q;
-    if (!query) {
-      return res.status(400).json({ error: 'Missing query parameter' });
+    const token = req.query.token;
+    if (token) {
+      const data = await getSearchContinuationData(token);
+      const videos = [];
+      let nextToken = '';
+
+      if (data.onResponseReceivedCommands && data.onResponseReceivedCommands[0] && data.onResponseReceivedCommands[0].appendContinuationItemsAction) {
+        const continuationItems = data.onResponseReceivedCommands[0].appendContinuationItemsAction.continuationItems || [];
+        
+        let items = [];
+        if (continuationItems[0] && continuationItems[0].itemSectionRenderer) {
+          items = continuationItems[0].itemSectionRenderer.contents || [];
+        }
+
+        for (const item of items) {
+          if (item.videoRenderer) {
+            const v = item.videoRenderer;
+            const videoId = v.videoId;
+            const title = v.title && v.title.runs && v.title.runs[0] && v.title.runs[0].text;
+            const thumbnail = `/api/thumbnail?id=${videoId}`;
+            const duration = v.lengthText && (v.lengthText.simpleText || (v.lengthText.runs && v.lengthText.runs[0] && v.lengthText.runs[0].text));
+            const viewsText = v.viewCountText && (v.viewCountText.simpleText || (v.viewCountText.runs && v.viewCountText.runs[0] && v.viewCountText.runs[0].text));
+            const ago = v.publishedTimeText && (v.publishedTimeText.simpleText || (v.publishedTimeText.runs && v.publishedTimeText.runs[0] && v.publishedTimeText.runs[0].text));
+            const desc = v.descriptionSnippet && v.descriptionSnippet.runs && v.descriptionSnippet.runs.map(r => r.text).join('');
+
+            videos.push({
+              id: videoId,
+              title: title || '',
+              thumbnail,
+              duration: duration || '',
+              author: v.ownerText && v.ownerText.runs && v.ownerText.runs[0] && v.ownerText.runs[0].text || '',
+              authorUrl: v.ownerText && v.ownerText.runs && v.ownerText.runs[0] && v.ownerText.runs[0].navigationEndpoint && v.ownerText.runs[0].navigationEndpoint.browseEndpoint && v.ownerText.runs[0].navigationEndpoint.browseEndpoint.browseId ? `/channel/${v.ownerText.runs[0].navigationEndpoint.browseEndpoint.browseId}` : '',
+              views: parseInnerTubeViews(viewsText),
+              ago: ago || '',
+              desc: desc || ''
+            });
+          }
+        }
+
+        const contItem = continuationItems.find(i => i.continuationItemRenderer);
+        if (contItem && contItem.continuationItemRenderer.continuationEndpoint && contItem.continuationItemRenderer.continuationEndpoint.continuationCommand) {
+          nextToken = contItem.continuationItemRenderer.continuationEndpoint.continuationCommand.token || '';
+        }
+      }
+
+      return res.json({
+        success: true,
+        videos,
+        continuationToken: nextToken
+      });
     }
 
-    const hl = req.query.hl || 'en';
-    const gl = req.query.gl || 'US';
+    const query = req.query.q;
+    if (!query) {
+      return res.status(400).json({ error: 'Missing query or token parameter' });
+    }
 
-    const results = await yts({ query, hl, gl });
-    const liveVideos = (results.live || [])
-      .filter(v => v.status === 'LIVE')
-      .map(v => ({
-        id: v.videoId,
-        title: v.title,
-        thumbnail: `/api/thumbnail?id=${v.videoId}`,
-        duration: 'LIVE',
-        author: v.author ? v.author.name : '',
-        authorUrl: v.author ? v.author.url : '',
-        views: v.watching,
-        ago: '',
-        isLive: true,
-        desc: v.description || '',
-      }));
-    const videos = (results.videos || []).slice(0, 12).map(v => ({
-      id: v.videoId,
-      title: v.title,
-      thumbnail: `/api/thumbnail?id=${v.videoId}`,
-      duration: v.timestamp || (v.duration ? v.duration.timestamp : ''),
-      author: v.author ? v.author.name : '',
-      authorUrl: v.author ? v.author.url : '',
-      views: v.views,
-      ago: v.ago,
-      desc: v.description || '',
-    }));
+    const hl = req.query.hl || 'vi';
+    const gl = req.query.gl || 'VN';
 
-    res.json({ success: true, videos: [...liveVideos, ...videos].slice(0, 12) });
+    const data = await getSearchData(query, hl, gl);
+    const contents = data.contents && data.contents.twoColumnSearchResultsRenderer && data.contents.twoColumnSearchResultsRenderer.primaryContents && data.contents.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer && data.contents.twoColumnSearchResultsRenderer.primaryContents.sectionListRenderer.contents;
+
+    const videos = [];
+    let continuationToken = '';
+
+    if (contents) {
+      const firstSection = contents.find(s => s.itemSectionRenderer);
+      if (firstSection && firstSection.itemSectionRenderer.contents) {
+        const items = firstSection.itemSectionRenderer.contents;
+        for (const item of items) {
+          if (item.videoRenderer) {
+            const v = item.videoRenderer;
+            const videoId = v.videoId;
+            const title = v.title && v.title.runs ? v.title.simpleText : (v.title && v.title.runs && v.title.runs[0] && v.title.runs[0].text);
+            const thumbnail = `/api/thumbnail?id=${videoId}`;
+            const duration = v.lengthText && (v.lengthText.simpleText || (v.lengthText.runs && v.lengthText.runs[0] && v.lengthText.runs[0].text));
+            const viewsText = v.viewCountText && (v.viewCountText.simpleText || (v.viewCountText.runs && v.viewCountText.runs[0] && v.viewCountText.runs[0].text));
+            const ago = v.publishedTimeText && (v.publishedTimeText.simpleText || (v.publishedTimeText.runs && v.publishedTimeText.runs[0] && v.publishedTimeText.runs[0].text));
+            const desc = v.descriptionSnippet && v.descriptionSnippet.runs && v.descriptionSnippet.runs.map(r => r.text).join('');
+
+            videos.push({
+              id: videoId,
+              title: title || '',
+              thumbnail,
+              duration: duration || '',
+              author: v.ownerText && v.ownerText.runs && v.ownerText.runs[0] && v.ownerText.runs[0].text || '',
+              authorUrl: v.ownerText && v.ownerText.runs && v.ownerText.runs[0] && v.ownerText.runs[0].navigationEndpoint && v.ownerText.runs[0].navigationEndpoint.browseEndpoint && v.ownerText.runs[0].navigationEndpoint.browseEndpoint.browseId ? `/channel/${v.ownerText.runs[0].navigationEndpoint.browseEndpoint.browseId}` : '',
+              views: parseInnerTubeViews(viewsText),
+              ago: ago || '',
+              desc: desc || ''
+            });
+          }
+        }
+      }
+
+      const contItem = contents.find(item => item.continuationItemRenderer);
+      if (contItem && contItem.continuationItemRenderer.continuationEndpoint && contItem.continuationItemRenderer.continuationEndpoint.continuationCommand) {
+        continuationToken = contItem.continuationItemRenderer.continuationEndpoint.continuationCommand.token || '';
+      }
+    }
+
+    res.json({
+      success: true,
+      videos,
+      continuationToken
+    });
   } catch (error) {
     console.error('Search error:', error);
     res.status(500).json({ error: 'Failed to perform search' });
@@ -172,9 +243,113 @@ app.get('/api/proxy-image', async (req, res) => {
 // Channel API endpoint using InnerTube browse API
 app.get('/api/channel', async (req, res) => {
   try {
+    const token = req.query.token;
+    if (token) {
+      const passedChannelId = req.query.id || '';
+      const passedChannelName = req.query.name || '';
+      const data = await getChannelContinuationData(token);
+      let items = [];
+      if (data.onResponseReceivedActions && data.onResponseReceivedActions[0] && data.onResponseReceivedActions[0].appendContinuationItemsAction) {
+        items = data.onResponseReceivedActions[0].appendContinuationItemsAction.continuationItems || [];
+      }
+      
+      const videos = [];
+      let nextToken = '';
+      
+      for (const item of items) {
+        if (item.continuationItemRenderer && item.continuationItemRenderer.continuationEndpoint && item.continuationItemRenderer.continuationEndpoint.continuationCommand) {
+          nextToken = item.continuationItemRenderer.continuationEndpoint.continuationCommand.token || '';
+          continue;
+        }
+        
+        const richContent = item.richItemRenderer && item.richItemRenderer.content;
+        const v = (richContent && richContent.videoRenderer) || item.videoRenderer;
+        const lockup = (richContent && richContent.lockupViewModel) || item.lockupViewModel;
+
+        if (v) {
+          const videoId = v.videoId;
+          const title = v.title && (v.title.simpleText || (v.title.runs && v.title.runs[0] && v.title.runs[0].text));
+          const thumbnail = `/api/thumbnail?id=${videoId}`;
+          const duration = v.lengthText && (v.lengthText.simpleText || (v.lengthText.runs && v.lengthText.runs[0] && v.lengthText.runs[0].text));
+          const viewsText = v.viewCountText && (v.viewCountText.simpleText || (v.viewCountText.runs && v.viewCountText.runs[0] && v.viewCountText.runs[0].text));
+          const ago = v.publishedTimeText && (v.publishedTimeText.simpleText || (v.publishedTimeText.runs && v.publishedTimeText.runs[0] && v.publishedTimeText.runs[0].text));
+          const desc = v.descriptionSnippet && v.descriptionSnippet.runs && v.descriptionSnippet.runs.map(r => r.text).join('');
+
+          videos.push({
+            id: videoId,
+            title: title || '',
+            thumbnail,
+            duration: duration || '',
+            author: passedChannelName || '',
+            authorUrl: passedChannelId ? `/channel/${passedChannelId}` : '',
+            views: parseInnerTubeViews(viewsText),
+            ago: ago || '',
+            desc: desc || ''
+          });
+        } else if (lockup) {
+          const videoId = lockup.contentId;
+          const metaVM = lockup.metadata && lockup.metadata.lockupMetadataViewModel;
+          const title = metaVM && metaVM.title && metaVM.title.content;
+          const thumbnail = `/api/thumbnail?id=${videoId}`;
+          
+          let duration = '';
+          const overlays = lockup.contentImage && lockup.contentImage.thumbnailViewModel && lockup.contentImage.thumbnailViewModel.overlays;
+          if (overlays) {
+            const bottomOverlay = overlays.find(o => o.thumbnailBottomOverlayViewModel);
+            if (bottomOverlay && bottomOverlay.thumbnailBottomOverlayViewModel.badges) {
+              const badge = bottomOverlay.thumbnailBottomOverlayViewModel.badges.find(b => b.thumbnailBadgeViewModel);
+              if (badge) {
+                duration = badge.thumbnailBadgeViewModel.text || '';
+              }
+            }
+          }
+
+          let viewsText = '';
+          let ago = '';
+          if (metaVM && metaVM.metadata && metaVM.metadata.contentMetadataViewModel && metaVM.metadata.contentMetadataViewModel.metadataRows) {
+            const rows = metaVM.metadata.contentMetadataViewModel.metadataRows;
+            if (rows[1] && rows[1].metadataParts) {
+              const parts = rows[1].metadataParts;
+              if (parts[0] && parts[0].text) viewsText = parts[0].text.content || '';
+              if (parts[1] && parts[1].text) ago = parts[1].text.content || '';
+            } else if (rows[0] && rows[0].metadataParts) {
+              rows[0].metadataParts.forEach(p => {
+                const text = p.text && p.text.content;
+                if (text) {
+                  if (text.includes('lượt xem') || text.includes('view') || text.includes('views')) {
+                    viewsText = text;
+                  } else if (text.trim().length > 0) {
+                    ago = text;
+                  }
+                }
+              });
+            }
+          }
+
+          videos.push({
+            id: videoId,
+            title: title || '',
+            thumbnail,
+            duration: duration || '',
+            author: passedChannelName || '',
+            authorUrl: passedChannelId ? `/channel/${passedChannelId}` : '',
+            views: parseInnerTubeViews(viewsText),
+            ago: ago || '',
+            desc: ''
+          });
+        }
+      }
+      
+      return res.json({
+        success: true,
+        videos,
+        continuationToken: nextToken
+      });
+    }
+
     const id = req.query.id;
     if (!id) {
-      return res.status(400).json({ error: 'Missing channel id parameter' });
+      return res.status(400).json({ error: 'Missing channel id or token parameter' });
     }
 
     let channelId = id;
@@ -342,6 +517,12 @@ app.get('/api/channel', async (req, res) => {
     const proxyAvatar = channelAvatar ? `/api/proxy-image?url=${encodeURIComponent(channelAvatar)}` : '';
     const proxyBanner = channelBanner ? `/api/proxy-image?url=${encodeURIComponent(channelBanner)}` : '';
 
+    let continuationToken = '';
+    const contItem = items.find(item => item.continuationItemRenderer);
+    if (contItem && contItem.continuationItemRenderer.continuationEndpoint && contItem.continuationItemRenderer.continuationEndpoint.continuationCommand) {
+      continuationToken = contItem.continuationItemRenderer.continuationEndpoint.continuationCommand.token || '';
+    }
+
     res.json({
       success: true,
       channel: {
@@ -351,7 +532,8 @@ app.get('/api/channel', async (req, res) => {
         banner: proxyBanner,
         subscribers: channelSubs
       },
-      videos
+      videos,
+      continuationToken
     });
   } catch (error) {
     console.error('Channel API error:', error);
@@ -640,4 +822,100 @@ function parseInnerTubeViews(viewsText) {
     num *= 1000;
   }
   return Math.floor(num);
+}
+
+async function getChannelContinuationData(token) {
+  const url = 'https://www.youtube.com/youtubei/v1/browse?prettyPrint=false';
+  const body = {
+    context: {
+      client: {
+        hl: "vi",
+        gl: "VN",
+        clientName: "WEB",
+        clientVersion: "2.20260731.00.00",
+        osName: "Windows",
+        osVersion: "10.0",
+        platform: "DESKTOP"
+      }
+    },
+    continuation: token
+  };
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'accept': '*/*',
+      'accept-language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7',
+      'content-type': 'application/json',
+      'origin': 'https://www.youtube.com',
+      'referer': 'https://www.youtube.com/',
+      'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36',
+      'x-youtube-client-name': '1',
+      'x-youtube-client-version': '2.20260731.00.00'
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) throw new Error('Failed to fetch channel continuation from InnerTube');
+  return res.json();
+}
+
+async function getSearchData(query, hl, gl) {
+  const url = 'https://www.youtube.com/youtubei/v1/search?prettyPrint=false';
+  const body = {
+    context: {
+      client: {
+        hl: hl === 'en' ? 'en' : 'vi',
+        gl: gl === 'US' ? 'US' : 'VN',
+        clientName: "WEB",
+        clientVersion: "2.20260731.00.00",
+        osName: "Windows",
+        osVersion: "10.0",
+        platform: "DESKTOP"
+      }
+    },
+    query
+  };
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36'
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) throw new Error('Failed to fetch search results from InnerTube');
+  return res.json();
+}
+
+async function getSearchContinuationData(token) {
+  const url = 'https://www.youtube.com/youtubei/v1/search?prettyPrint=false';
+  const body = {
+    context: {
+      client: {
+        hl: "vi",
+        gl: "VN",
+        clientName: "WEB",
+        clientVersion: "2.20260731.00.00",
+        osName: "Windows",
+        osVersion: "10.0",
+        platform: "DESKTOP"
+      }
+    },
+    continuation: token
+  };
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36'
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) throw new Error('Failed to fetch search continuation from InnerTube');
+  return res.json();
 }

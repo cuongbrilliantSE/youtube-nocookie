@@ -13,6 +13,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSuggested = []; // related videos loaded for the currently open video
     let hasAutoAdvanced = false; // guards against firing auto-advance more than once per video
     let currentChannelFilter = null; // name of the channel currently being filtered
+    let channelContinuationToken = '';
+    let isLoadingMoreChannel = false;
+    let currentChannelId = '';
+    let currentChannelName = '';
+    let searchContinuationToken = '';
+    let isLoadingMoreSearch = false;
     const API_BASE = (location.hostname === 'localhost' && location.port !== '') ? '' : 'https://jolly-mousse-2aec3a.netlify.app';
 
     // ── Avatar palette ──
@@ -490,6 +496,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const chan = data.channel;
+            currentChannelId = chan.id;
+            currentChannelName = chan.title;
             sessionStorage.setItem('yt_nocookie_channel_id', chan.id);
             sessionStorage.setItem('yt_nocookie_channel_name', chan.title);
 
@@ -516,9 +524,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 data.videos.forEach(video => {
                     channelGrid.appendChild(createVideoCard(video));
                 });
+                channelContinuationToken = data.continuationToken || '';
             } else {
                 channelGrid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: var(--textFaint); padding: 40px 0;">Kênh này chưa có video nào.</p>';
+                channelContinuationToken = '';
             }
+            isLoadingMoreChannel = false;
         } catch (e) {
             console.error('loadChannelData error:', e);
             channelLoader.style.display = 'none';
@@ -532,6 +543,9 @@ document.addEventListener('DOMContentLoaded', () => {
         isSearching = true;
         videoGrid.innerHTML = '';
         homeEmpty.style.display = 'none';
+        
+        const loaderText = gridLoader.querySelector('span');
+        if (loaderText) loaderText.textContent = 'Đang tìm kiếm...';
         gridLoader.style.display = 'flex';
         hideError();
 
@@ -551,6 +565,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             searchResults = data.videos;
+            searchContinuationToken = data.continuationToken || '';
+            isLoadingMoreSearch = false;
             if (currentChannelFilter) {
                 const target = currentChannelFilter.toLowerCase().trim();
                 const filtered = searchResults.filter(v => {
@@ -939,4 +955,88 @@ document.addEventListener('DOMContentLoaded', () => {
     function hideError() {
         errorMsg.style.display = 'none';
     }
+
+    // ── Infinite scroll for channel videos ──
+    async function loadMoreChannelVideos() {
+        if (isLoadingMoreChannel || !channelContinuationToken) return;
+        isLoadingMoreChannel = true;
+        channelLoader.style.display = 'flex';
+
+        try {
+            const res = await fetch(`${API_BASE}/api/channel?token=${encodeURIComponent(channelContinuationToken)}&id=${encodeURIComponent(currentChannelId)}&name=${encodeURIComponent(currentChannelName)}`);
+            const data = await res.json();
+            channelLoader.style.display = 'none';
+
+            if (data.success && data.videos && data.videos.length > 0) {
+                data.videos.forEach(video => {
+                    channelGrid.appendChild(createVideoCard(video));
+                });
+                channelContinuationToken = data.continuationToken || '';
+            } else {
+                channelContinuationToken = ''; // No more videos
+            }
+        } catch (e) {
+            console.error('loadMoreChannelVideos error:', e);
+            channelLoader.style.display = 'none';
+        } finally {
+            isLoadingMoreChannel = false;
+        }
+    }
+
+    async function loadMoreSearchVideos() {
+        if (isLoadingMoreSearch || !searchContinuationToken) return;
+        isLoadingMoreSearch = true;
+
+        const loaderText = gridLoader.querySelector('span');
+        if (loaderText) loaderText.textContent = 'Đang tải thêm video...';
+        gridLoader.style.display = 'flex';
+
+        try {
+            const res = await fetch(`${API_BASE}/api/search?token=${encodeURIComponent(searchContinuationToken)}`);
+            const data = await res.json();
+            gridLoader.style.display = 'none';
+
+            if (data.success && data.videos && data.videos.length > 0) {
+                let newVideos = data.videos;
+                if (currentChannelFilter) {
+                    const target = currentChannelFilter.toLowerCase().trim();
+                    newVideos = newVideos.filter(v => {
+                        if (!v.author) return false;
+                        const author = v.author.toLowerCase().trim();
+                        return author === target || author.includes(target) || target.includes(author);
+                    });
+                }
+
+                newVideos.forEach(video => {
+                    videoGrid.appendChild(createVideoCard(video));
+                    searchResults.push(video);
+                });
+                searchContinuationToken = data.continuationToken || '';
+            } else {
+                searchContinuationToken = '';
+            }
+        } catch (e) {
+            console.error('loadMoreSearchVideos error:', e);
+            gridLoader.style.display = 'none';
+        } finally {
+            isLoadingMoreSearch = false;
+        }
+    }
+
+    window.addEventListener('scroll', () => {
+        const scrollHeight = document.documentElement.scrollHeight;
+        const scrollTop = window.scrollY || document.documentElement.scrollTop;
+        const clientHeight = document.documentElement.clientHeight;
+
+        if (view === 'channel') {
+            if (scrollHeight - scrollTop - clientHeight < 400) {
+                loadMoreChannelVideos();
+            }
+        } else if (view === 'home') {
+            if (!query) return;
+            if (scrollHeight - scrollTop - clientHeight < 400) {
+                loadMoreSearchVideos();
+            }
+        }
+    });
 });
