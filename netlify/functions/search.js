@@ -1,16 +1,28 @@
 const parseInnerTubeViews = (viewsText) => {
   if (!viewsText) return 0;
-  const clean = viewsText.toLowerCase().replace(/[^a-z0-9,.\s]/g, '').trim();
-  let num = parseFloat(clean.replace(/,/g, '.').replace(/[^0-9.]/g, '')) || 0;
   
-  if (clean.includes('b') || clean.includes('tỷ')) {
-    num *= 1000000000;
+  const clean = viewsText.toLowerCase()
+    .replace(/l\u01b0\u1ee3t xem|views|view|ng\u01b0\u1ee3i \u0111\u0103ng k\u00fd|subscribers|subscriber/g, '')
+    .trim();
+
+  let multiplier = 1;
+  if (clean.includes('b') || clean.includes('t\u1ef7')) {
+    multiplier = 1000000000;
   } else if (clean.includes('tr') || clean.includes('m')) {
-    num *= 1000000;
-  } else if (clean.includes('n') || clean.includes('k') || clean.includes('nghìn')) {
-    num *= 1000;
+    multiplier = 1000000;
+  } else if (clean.includes('n') || clean.includes('k') || clean.includes('ngh\u00ecn')) {
+    multiplier = 1000;
   }
-  return Math.floor(num);
+
+  if (multiplier > 1) {
+    const numStr = clean.replace(/,/g, '.').replace(/[^0-9.]/g, '');
+    const num = parseFloat(numStr) || 0;
+    return Math.floor(num * multiplier);
+  } else {
+    const numStr = clean.replace(/[^0-9]/g, '');
+    const num = parseInt(numStr, 10) || 0;
+    return num;
+  }
 };
 
 const getSearchData = async (query, hl, gl) => {
