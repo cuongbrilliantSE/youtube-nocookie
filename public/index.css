@@ -105,38 +105,31 @@ img { display: block; }
     gap: 12px;
     margin-bottom: 32px;
     padding: 0 4px;
+    text-decoration: none;
+    user-select: none;
 }
 
-/* Logo mark: accent rounded square with closed-eye cutout */
+/* Minimalist Logo Mark: Flat clean badge matching app accent */
 .logo-mark {
     width: 34px;
     height: 34px;
-    background: var(--accent);
-    border-radius: 10px;
+    border-radius: 9px;
+    background: var(--surfaceHover);
+    border: 1px solid var(--border);
     flex-shrink: 0;
-    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
 }
 
-.logo-mark::before {
-    content: '';
-    position: absolute;
-    width: 13px;
-    height: 13px;
-    background: var(--logo-cutout);
-    border-radius: 50%;
-    top: 8px;
-    left: 10px;
+.sidebar-logo:hover .logo-mark {
+    background: var(--surface);
+    border-color: var(--accent);
 }
 
-.logo-mark::after {
-    content: '';
-    position: absolute;
-    width: 20px;
-    height: 4px;
-    background: var(--accent);
-    border-radius: 2px;
-    bottom: 9px;
-    left: 7px;
+.logo-mark svg {
+    display: block;
 }
 
 .logo-text {
@@ -145,17 +138,20 @@ img { display: block; }
 }
 
 .logo-wordmark {
-    font-size: 19px;
+    font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+    font-size: 20px;
     font-weight: 700;
+    letter-spacing: -0.5px;
     color: var(--text);
-    line-height: 1.1;
+    line-height: 1;
 }
 
 .logo-tagline {
-    font-size: 10.5px;
+    font-size: 11px;
     color: var(--textFaint);
     font-weight: 500;
-    line-height: 1.4;
+    line-height: 1.3;
+    margin-top: 3px;
 }
 
 /* Sidebar nav */
